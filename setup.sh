@@ -10,7 +10,11 @@ if [ ! -f .env ]; then
     fi
     varname="${line%%=*}"
     default="${line#*=}"
-    if [[ -n "$default" ]]; then
+    if [[ "$varname" == *SECRET* ]]; then
+      read -rsp "${varname}: " value
+      echo
+      echo "${varname}=${value}" >> .env
+    elif [[ -n "$default" ]]; then
       read -r -p "${varname} [${default}]: " value
       echo "${varname}=${value:-$default}" >> .env
     else
@@ -25,7 +29,10 @@ set -o allexport
 source .env
 set +o allexport
 
-envsubst '${ROOT_DOMAIN} ${VPS_PUBLIC_IP} ${VPS_TAILNET_IP}' \
+GOOGLE_OIDC_ALLOWED_USERS_YAML=$(echo "$GOOGLE_OIDC_ALLOWED_USERS" | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//' | sed 's/^/    - "/' | sed 's/$/"/')
+export GOOGLE_OIDC_ALLOWED_USERS_YAML
+
+envsubst '${ROOT_DOMAIN} ${VPS_PUBLIC_IP} ${VPS_TAILNET_IP} ${GOOGLE_OIDC_CLIENT_ID} ${GOOGLE_OIDC_CLIENT_SECRET} ${GOOGLE_OIDC_ALLOWED_USERS_YAML}' \
   < headscale/config.yaml.tmpl > headscale/config.yaml
 
 envsubst '${ROOT_DOMAIN}' \

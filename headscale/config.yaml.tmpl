@@ -51,3 +51,14 @@ dns:
 
 log:
   level: info
+
+oidc:
+  issuer: "https://accounts.google.com"
+  client_id: "${GOOGLE_OIDC_CLIENT_ID}"
+  client_secret: "${GOOGLE_OIDC_CLIENT_SECRET}"
+  scope: ["openid", "profile", "email"]
+  allowed_users:
+${GOOGLE_OIDC_ALLOWED_USERS_YAML}
+  pkce:
+    enabled: true
+    method: S256
