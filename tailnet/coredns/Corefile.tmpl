@@ -1,0 +1,13 @@
+. {
+  forward . 1.1.1.1 1.0.0.1
+  prometheus :9153
+  log
+  errors
+}
+
+lab.${ROOT_DOMAIN} {
+  file /etc/coredns/db.lab.domain
+  prometheus :9153
+  log
+  errors
+}

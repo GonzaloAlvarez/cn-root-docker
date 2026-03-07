@@ -1,0 +1,76 @@
+{
+  "services": [
+    {
+      "name": "consul-ui",
+      "id": "consul-ui-vps",
+      "address": "127.0.0.1",
+      "port": 8500,
+      "tags": [
+        "traefik.enable=true",
+        "traefik.http.routers.consul-ui.rule=Host(`consul.${LAB_DOMAIN}`)",
+        "traefik.http.routers.consul-ui.entrypoints=websecure",
+        "traefik.http.routers.consul-ui.tls=true",
+        "traefik.http.routers.consul-ui.tls.certresolver=dns"
+      ],
+      "check": {
+        "tcp": "127.0.0.1:8500",
+        "interval": "10s",
+        "deregister_critical_service_after": "2m"
+      }
+    },
+    {
+      "name": "traefik-dashboard",
+      "id": "traefik-dashboard-vps",
+      "address": "127.0.0.1",
+      "port": 8080,
+      "tags": [
+        "traefik.enable=true",
+        "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${LAB_DOMAIN}`)",
+        "traefik.http.routers.traefik-dashboard.entrypoints=websecure",
+        "traefik.http.routers.traefik-dashboard.tls=true",
+        "traefik.http.routers.traefik-dashboard.tls.certresolver=dns"
+      ],
+      "check": {
+        "tcp": "127.0.0.1:8080",
+        "interval": "10s",
+        "deregister_critical_service_after": "2m"
+      }
+    },
+    {
+      "name": "prometheus",
+      "id": "prometheus-vps",
+      "address": "127.0.0.1",
+      "port": 9090,
+      "tags": [
+        "traefik.enable=true",
+        "traefik.http.routers.prometheus.rule=Host(`prometheus.${LAB_DOMAIN}`)",
+        "traefik.http.routers.prometheus.entrypoints=websecure",
+        "traefik.http.routers.prometheus.tls=true",
+        "traefik.http.routers.prometheus.tls.certresolver=dns"
+      ],
+      "check": {
+        "tcp": "127.0.0.1:9090",
+        "interval": "10s",
+        "deregister_critical_service_after": "2m"
+      }
+    },
+    {
+      "name": "grafana",
+      "id": "grafana-vps",
+      "address": "127.0.0.1",
+      "port": 3000,
+      "tags": [
+        "traefik.enable=true",
+        "traefik.http.routers.grafana.rule=Host(`grafana.${LAB_DOMAIN}`)",
+        "traefik.http.routers.grafana.entrypoints=websecure",
+        "traefik.http.routers.grafana.tls=true",
+        "traefik.http.routers.grafana.tls.certresolver=dns"
+      ],
+      "check": {
+        "tcp": "127.0.0.1:3000",
+        "interval": "10s",
+        "deregister_critical_service_after": "2m"
+      }
+    }
+  ]
+}

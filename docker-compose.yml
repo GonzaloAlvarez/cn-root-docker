@@ -1,0 +1,147 @@
+services:
+  traefik-public:
+    image: traefik:v3.1
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.dns.acme.email=${ADMIN_EMAIL}"
+      - "--certificatesresolvers.dns.acme.storage=/acme/acme.json"
+      - "--certificatesresolvers.dns.acme.dnschallenge=true"
+      - "--certificatesresolvers.dns.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.dns.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
+    ports:
+      - "443:443/tcp"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "traefik_public_acme:/acme"
+    environment:
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+    restart: unless-stopped
+
+  headscale:
+    image: headscale/headscale:stable
+    command: ["serve"]
+    volumes:
+      - "./headscale/config.yaml:/etc/headscale/config.yaml:ro"
+      - "./headscale/acl.hujson:/etc/headscale/acl.hujson:ro"
+      - "headscale_data:/var/lib/headscale"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.headscale.rule=Host(`${HEADSCALE_DOMAIN}`)"
+      - "traefik.http.routers.headscale.entrypoints=websecure"
+      - "traefik.http.routers.headscale.tls=true"
+      - "traefik.http.routers.headscale.tls.certresolver=dns"
+      - "traefik.http.services.headscale.loadbalancer.server.port=8080"
+    ports:
+      - "3478:3478/udp"
+    depends_on:
+      - traefik-public
+    restart: unless-stopped
+
+  ts-infra:
+    image: tailscale/tailscale:latest
+    hostname: ts-infra
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ts_infra_state:/var/lib/tailscale
+    environment:
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_AUTHKEY=${INFRA_AUTHKEY}
+      - TS_HOSTNAME=infra-vps
+      - TS_ACCEPT_DNS=true
+      - TS_AUTH_ONCE=true
+      - TS_EXTRA_ARGS=--login-server=https://${HEADSCALE_DOMAIN}
+    restart: unless-stopped
+
+  traefik-lab:
+    image: traefik:v3.1
+    network_mode: "service:ts-infra"
+    command:
+      - "--entrypoints.websecure.address=:443"
+      - "--api=true"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--metrics.prometheus=true"
+      - "--providers.consulcatalog=true"
+      - "--providers.consulcatalog.endpoint.address=127.0.0.1:8500"
+      - "--providers.consulcatalog.exposedbydefault=false"
+      - "--providers.consulcatalog.prefix=traefik"
+      - "--certificatesresolvers.dns.acme.email=${ADMIN_EMAIL}"
+      - "--certificatesresolvers.dns.acme.storage=/acme/acme.json"
+      - "--certificatesresolvers.dns.acme.dnschallenge=true"
+      - "--certificatesresolvers.dns.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.dns.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
+    volumes:
+      - "traefik_lab_acme:/acme"
+    environment:
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+    depends_on:
+      - ts-infra
+      - consul
+    restart: unless-stopped
+
+  coredns:
+    image: coredns/coredns:1.11.1
+    network_mode: "service:ts-infra"
+    command: ["-conf", "/etc/coredns/Corefile"]
+    volumes:
+      - "./tailnet/coredns/Corefile:/etc/coredns/Corefile:ro"
+      - "./tailnet/coredns/db.lab.domain:/etc/coredns/db.lab.domain:ro"
+    depends_on:
+      - ts-infra
+    restart: unless-stopped
+
+  consul:
+    image: hashicorp/consul:1.18
+    network_mode: "service:ts-infra"
+    command: ["agent", "-server", "-bootstrap-expect=1", "-ui", "-config-dir=/consul/config"]
+    volumes:
+      - "./tailnet/consul:/consul/config:ro"
+      - "consul_data:/consul/data"
+    depends_on:
+      - ts-infra
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    network_mode: "service:ts-infra"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+    volumes:
+      - "./tailnet/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "prometheus_data:/prometheus"
+    depends_on:
+      - ts-infra
+      - consul
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    network_mode: "service:ts-infra"
+    environment:
+      - GF_SERVER_ROOT_URL=https://grafana.${LAB_DOMAIN}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD}
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - "./tailnet/grafana/provisioning:/etc/grafana/provisioning:ro"
+      - "grafana_data:/var/lib/grafana"
+    depends_on:
+      - ts-infra
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  headscale_data:
+  traefik_public_acme:
+  ts_infra_state:
+  traefik_lab_acme:
+  consul_data:
+  prometheus_data:
+  grafana_data:

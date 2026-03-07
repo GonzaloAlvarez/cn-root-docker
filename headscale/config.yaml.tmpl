@@ -1,0 +1,53 @@
+server_url: "https://hs.${ROOT_DOMAIN}"
+listen_addr: "0.0.0.0:8080"
+grpc_listen_addr: "0.0.0.0:50443"
+grpc_allow_insecure: false
+
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+
+derp:
+  server:
+    enabled: true
+    region_id: 999
+    region_code: "cloudnet"
+    region_name: "CloudNet Embedded DERP"
+    verify_clients: true
+    stun_listen_addr: "0.0.0.0:3478"
+    private_key_path: /var/lib/headscale/derp_server_private.key
+    automatically_add_embedded_derp_region: true
+    ipv4: "${VPS_PUBLIC_IP}"
+  urls:
+    - https://controlplane.tailscale.com/derpmap/default
+  paths: []
+  auto_update_enabled: true
+  update_frequency: 3h
+
+database:
+  type: sqlite
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+    write_ahead_log: true
+
+policy:
+  mode: file
+  path: /etc/headscale/acl.hujson
+
+dns:
+  magic_dns: true
+  base_domain: "ts.${ROOT_DOMAIN}"
+  override_local_dns: true
+  nameservers:
+    global:
+      - 1.1.1.1
+      - 1.0.0.1
+  split:
+    "lab.${ROOT_DOMAIN}":
+      - "${VPS_TAILNET_IP}"
+
+log:
+  level: info

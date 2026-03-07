@@ -1,0 +1,11 @@
+{
+  "tagOwners": {
+    "tag:infra": ["autogroup:member"],
+    "tag:svc":   ["autogroup:member"]
+  },
+
+  "acls": [
+    { "action": "accept", "src": ["autogroup:member"], "dst": ["tag:infra:53", "tag:infra:443"] },
+    { "action": "accept", "src": ["tag:infra"], "dst": ["tag:svc:80,3000,2283"] }
+  ]
+}
