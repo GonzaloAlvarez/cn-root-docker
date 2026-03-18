@@ -1,10 +1,20 @@
 services:
+  docker-proxy:
+    image: nginx:alpine
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./docker-proxy.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+
   traefik-public:
-    image: traefik:v3.1
+    image: traefik:v3.6.9
     command:
+      - "--log.level=DEBUG"
       - "--providers.docker=true"
+      - "--providers.docker.endpoint=tcp://docker-proxy:2375"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.dns.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
       - "--certificatesresolvers.dns.acme.email=${ADMIN_EMAIL}"
       - "--certificatesresolvers.dns.acme.storage=/acme/acme.json"
       - "--certificatesresolvers.dns.acme.dnschallenge=true"
@@ -13,16 +23,16 @@ services:
     ports:
       - "443:443/tcp"
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "traefik_public_acme:/acme"
     environment:
-      - CF_API_EMAIL=${CF_API_EMAIL}
-      - CF_API_KEY=${CF_API_KEY}
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+    depends_on:
+      - docker-proxy
     restart: unless-stopped
 
   headscale:
     image: headscale/headscale:stable
-    command: ["serve"]
+    command: [ "serve" ]
     volumes:
       - "./headscale/config.yaml:/etc/headscale/config.yaml:ro"
       - "./headscale/acl.hujson:/etc/headscale/acl.hujson:ro"
@@ -60,7 +70,7 @@ services:
     restart: unless-stopped
 
   traefik-lab:
-    image: traefik:v3.1
+    image: traefik:v3.6.9
     network_mode: "service:ts-infra"
     command:
       - "--entrypoints.websecure.address=:443"
@@ -80,8 +90,7 @@ services:
     volumes:
       - "traefik_lab_acme:/acme"
     environment:
-      - CF_API_EMAIL=${CF_API_EMAIL}
-      - CF_API_KEY=${CF_API_KEY}
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
     depends_on:
       - ts-infra
       - consul
@@ -90,7 +99,7 @@ services:
   coredns:
     image: coredns/coredns:1.11.1
     network_mode: "service:ts-infra"
-    command: ["-conf", "/etc/coredns/Corefile"]
+    command: [ "-conf", "/etc/coredns/Corefile" ]
     volumes:
       - "./tailnet/coredns/Corefile:/etc/coredns/Corefile:ro"
       - "./tailnet/coredns/db.lab.domain:/etc/coredns/db.lab.domain:ro"
@@ -101,9 +110,9 @@ services:
   consul:
     image: hashicorp/consul:1.18
     network_mode: "service:ts-infra"
-    command: ["agent", "-server", "-bootstrap-expect=1", "-ui", "-config-dir=/consul/config"]
+    command: [ "agent", "-server", "-bootstrap-expect=1", "-ui", "-config-dir=/consul/config" ]
     volumes:
-      - "./tailnet/consul:/consul/config:ro"
+      - "./tailnet/consul:/consul/config"
       - "consul_data:/consul/data"
     depends_on:
       - ts-infra

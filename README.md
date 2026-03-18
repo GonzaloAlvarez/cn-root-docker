@@ -33,15 +33,19 @@ cp .env.example .env
 
 ### 2. Variable reference
 
+The four domain variables are related — here is an example using `example.com` as the apex domain:
+
+| Variable | Example value | What it controls |
+|---|---|---|
+| `ROOT_DOMAIN` | `example.com` | Apex domain. All other domains are subdomains of this. |
+| `LAB_DOMAIN` | `lab.example.com` | Internal lab services accessible on the tailnet: `grafana.lab.example.com`, `consul.lab.example.com`, etc. Must be `lab.<ROOT_DOMAIN>` — the config files hardcode the `lab.` prefix. |
+| `HEADSCALE_DOMAIN` | `hs.example.com` | Public hostname for the Headscale control plane. Must be `hs.<ROOT_DOMAIN>` — the Headscale config hardcodes the `hs.` prefix when building its `server_url`. |
+| `TAILNET_DOMAIN` | `ts.example.com` | MagicDNS base domain assigned to tailnet machines (e.g. `my-laptop.ts.example.com`). Must be `ts.<ROOT_DOMAIN>` — the Headscale config hardcodes the `ts.` prefix for `base_domain`. |
+
 | Variable | Where to get it |
 |---|---|
-| `ROOT_DOMAIN` | Your apex domain (e.g. `example.com`). Everything is a subdomain of this. |
-| `LAB_DOMAIN` | Subdomain used for internal lab services, e.g. `lab.example.com`. |
-| `HEADSCALE_DOMAIN` | Subdomain for the Headscale control plane, e.g. `hs.example.com`. |
-| `TAILNET_DOMAIN` | Subdomain for MagicDNS on the tailnet, e.g. `ts.example.com`. |
 | `ADMIN_EMAIL` | Your email — used by Let's Encrypt for certificate expiry notices. |
-| `CF_API_EMAIL` | The email address of your Cloudflare account. |
-| `CF_API_KEY` | Your Cloudflare **Global API Key** — found in the Cloudflare dashboard under My Profile → API Tokens → Global API Key. |
+| `CF_DNS_API_TOKEN` | A Cloudflare **API Token** with DNS edit permissions — create one at My Profile → API Tokens → Create Token, using the "Edit zone DNS" template. |
 | `VPS_PUBLIC_IP` | The Elastic IP assigned to the EC2 instance after `cn-root` CDK deploy. |
 | `INFRA_AUTHKEY` | A Headscale pre-auth key. Generated during bring-up (see below). |
 | `VPS_TAILNET_IP` | The tailnet IP of the VPS. Discovered after `ts-infra` starts (see below). |
@@ -55,6 +59,18 @@ cp .env.example .env
 ## Bring-up sequence
 
 Bring-up happens in two passes because `ts-infra` needs a Headscale auth key, which can only be created after Headscale is running — and several services need the VPS tailnet IP, which only exists after `ts-infra` has joined the network.
+
+### Before you start — create the DNS A record
+
+Traefik only handles TLS certificates — it does **not** create DNS records. You must manually create an A record in Cloudflare pointing `HEADSCALE_DOMAIN` to your VPS public IP before starting the stack, otherwise the certificate challenge will succeed but the domain will be unreachable.
+
+In the Cloudflare dashboard for your domain, add:
+
+| Type | Name | Content | Proxy status |
+|---|---|---|---|
+| A | `hs` (or whatever `HEADSCALE_DOMAIN` is) | `VPS_PUBLIC_IP` | DNS only (grey cloud) |
+
+Proxy must be **DNS only** — Cloudflare's proxy (orange cloud) intercepts port 443 and will break Headscale's gRPC and DERP traffic.
 
 ### Pass 1 — public plane
 
@@ -70,8 +86,8 @@ docker compose up -d traefik-public headscale
 Wait for Traefik to obtain a TLS certificate (check `docker compose logs traefik-public`), then create a Headscale user and generate a pre-auth key for `ts-infra`:
 
 ```sh
-docker exec -it headscale headscale users create admin
-docker exec -it headscale headscale preauthkeys create --user admin --reusable --expiration 1h
+docker exec -it cloudnet-headscale-1 headscale users create admin
+docker exec -it cloudnet-headscale-1 headscale preauthkeys create --user 1 --reusable --expiration 1h
 ```
 
 Copy the key that's printed, then add it to `.env`:
