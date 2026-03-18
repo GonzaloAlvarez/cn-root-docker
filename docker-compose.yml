@@ -16,7 +16,8 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "traefik_public_acme:/acme"
     environment:
-      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+      - CF_API_EMAIL=${CF_API_EMAIL}
+      - CF_API_KEY=${CF_API_KEY}
     restart: unless-stopped
 
   headscale:
@@ -79,7 +80,8 @@ services:
     volumes:
       - "traefik_lab_acme:/acme"
     environment:
-      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+      - CF_API_EMAIL=${CF_API_EMAIL}
+      - CF_API_KEY=${CF_API_KEY}
     depends_on:
       - ts-infra
       - consul
