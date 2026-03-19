@@ -1,17 +1,9 @@
 services:
-  docker-proxy:
-    image: nginx:alpine
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./docker-proxy.conf:/etc/nginx/nginx.conf:ro
-    restart: unless-stopped
-
   traefik-public:
     image: traefik:v3.6.9
     command:
       - "--log.level=DEBUG"
       - "--providers.docker=true"
-      - "--providers.docker.endpoint=tcp://docker-proxy:2375"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.websecure.address=:443"
       - "--certificatesresolvers.dns.acme.caserver=${ACME_CASERVER}"
@@ -23,11 +15,10 @@ services:
     ports:
       - "443:443/tcp"
     volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "traefik_public_acme:/acme"
     environment:
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
-    depends_on:
-      - docker-proxy
     restart: unless-stopped
 
   headscale:
