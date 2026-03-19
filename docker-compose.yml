@@ -14,7 +14,7 @@ services:
       - "--providers.docker.endpoint=tcp://docker-proxy:2375"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.dns.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.dns.acme.caserver=${ACME_CASERVER}"
       - "--certificatesresolvers.dns.acme.email=${ADMIN_EMAIL}"
       - "--certificatesresolvers.dns.acme.storage=/acme/acme.json"
       - "--certificatesresolvers.dns.acme.dnschallenge=true"
@@ -60,6 +60,7 @@ services:
       - /dev/net/tun:/dev/net/tun
     volumes:
       - ts_infra_state:/var/lib/tailscale
+      - ./certs:/staging-certs:ro
     environment:
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_AUTHKEY=${INFRA_AUTHKEY}
@@ -67,6 +68,7 @@ services:
       - TS_ACCEPT_DNS=true
       - TS_AUTH_ONCE=true
       - TS_EXTRA_ARGS=--login-server=https://${HEADSCALE_DOMAIN}
+      - SSL_CERT_DIR=${SSL_CERT_DIR}
     restart: unless-stopped
 
   traefik-lab:
@@ -82,6 +84,7 @@ services:
       - "--providers.consulcatalog.endpoint.address=127.0.0.1:8500"
       - "--providers.consulcatalog.exposedbydefault=false"
       - "--providers.consulcatalog.prefix=traefik"
+      - "--certificatesresolvers.dns.acme.caserver=${ACME_CASERVER}"
       - "--certificatesresolvers.dns.acme.email=${ADMIN_EMAIL}"
       - "--certificatesresolvers.dns.acme.storage=/acme/acme.json"
       - "--certificatesresolvers.dns.acme.dnschallenge=true"

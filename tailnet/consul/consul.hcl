@@ -1,6 +1,7 @@
 datacenter = "cloudnet"
 data_dir   = "/consul/data"
-client_addr = "0.0.0.0"
+client_addr    = "0.0.0.0"
+advertise_addr = "127.0.0.1"
 
 ui_config {
   enabled = true

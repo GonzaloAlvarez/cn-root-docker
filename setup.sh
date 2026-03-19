@@ -1,6 +1,17 @@
 #!/bin/bash
 set -e
 
+MODE="${1:-production}"
+
+set_env_var() {
+  local key="$1" val="$2"
+  if grep -q "^${key}=" .env 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${val}|" .env
+  else
+    echo "${key}=${val}" >> .env
+  fi
+}
+
 if [ ! -f .env ]; then
   > .env
   while IFS= read -r line; do
@@ -28,6 +39,29 @@ fi
 set -o allexport
 source .env
 set +o allexport
+
+mkdir -p certs
+
+if [ "$MODE" = "staging" ]; then
+  echo "Configuring staging ACME..."
+  curl -sf -o certs/letsencrypt-stg-root-x1.pem \
+    https://letsencrypt.org/certs/staging/letsencrypt-stg-root-x1.pem
+  curl -sf -o certs/letsencrypt-stg-root-x2.pem \
+    https://letsencrypt.org/certs/staging/letsencrypt-stg-root-x2.pem
+  set_env_var ACME_CASERVER "https://acme-staging-v02.api.letsencrypt.org/directory"
+  set_env_var SSL_CERT_DIR "/etc/ssl/certs:/staging-certs"
+  echo "Done. To apply:"
+  echo "  docker compose down && docker volume rm cloudnet_traefik_public_acme cloudnet_traefik_lab_acme"
+  echo "  docker compose up -d traefik-public headscale ts-infra consul traefik-lab coredns prometheus grafana"
+else
+  echo "Configuring production ACME..."
+  rm -f certs/letsencrypt-stg-root-*.pem
+  set_env_var ACME_CASERVER "https://acme-v02.api.letsencrypt.org/directory"
+  set_env_var SSL_CERT_DIR "/etc/ssl/certs"
+  echo "Done. To apply:"
+  echo "  docker compose down && docker volume rm cloudnet_traefik_public_acme cloudnet_traefik_lab_acme"
+  echo "  docker compose up -d traefik-public headscale ts-infra consul traefik-lab coredns prometheus grafana"
+fi
 
 GOOGLE_OIDC_ALLOWED_USERS_YAML=$(echo "$GOOGLE_OIDC_ALLOWED_USERS" | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//' | sed 's/^/    - "/' | sed 's/$/"/')
 export GOOGLE_OIDC_ALLOWED_USERS_YAML
