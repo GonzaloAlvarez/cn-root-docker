@@ -129,6 +129,17 @@ services:
       - consul
     restart: unless-stopped
 
+  loki:
+    image: grafana/loki:3.4.2
+    network_mode: "service:ts-infra"
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - "./tailnet/loki/loki.yml:/etc/loki/loki.yml:ro"
+      - "loki_data:/loki"
+    depends_on:
+      - ts-infra
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:11.2.0
     network_mode: "service:ts-infra"
@@ -152,3 +163,4 @@ volumes:
   consul_data:
   prometheus_data:
   grafana_data:
+  loki_data:
