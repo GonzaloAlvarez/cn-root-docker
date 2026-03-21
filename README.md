@@ -87,7 +87,7 @@ Wait for Traefik to obtain a TLS certificate (check `docker compose logs traefik
 
 ```sh
 docker exec -it cloudnet-headscale-1 headscale users create admin
-docker exec -it cloudnet-headscale-1 headscale preauthkeys create --user 1 --reusable --expiration 1h
+docker exec -it cloudnet-headscale-1 headscale preauthkeys create --user 1 --tags tag:infra --reusable --expiration 1h
 ```
 
 Copy the key that's printed, then add it to `.env`:
@@ -105,7 +105,7 @@ docker compose up -d ts-infra consul traefik-lab coredns prometheus grafana
 Once `ts-infra` is up, get its tailnet IP:
 
 ```sh
-docker exec ts-infra tailscale ip -4
+docker exec cloudnet-ts-infra-1 tailscale ip -4
 ```
 
 Add that IP to `.env` as `VPS_TAILNET_IP`, then re-run setup to regenerate the config files that reference it:
@@ -116,3 +116,136 @@ docker compose restart headscale coredns
 ```
 
 At this point all services are running. Verify with `docker compose ps`.
+
+---
+
+## Troubleshooting
+
+### Tailscale running in userspace mode (no `tailscale0` interface)
+
+Services in the shared ts-infra namespace (traefik-lab, consul, coredns) need Tailscale in kernel mode to make outbound tailnet connections and to receive inbound traffic on arbitrary ports. If `tailscale0` is missing, the networking won't work:
+
+```sh
+docker exec cloudnet-ts-infra-1 ip addr show tailscale0
+# "Device does not exist" → userspace mode
+```
+
+Fix: ensure `ts-infra` has both of these env vars in `docker-compose.yml`:
+
+```yaml
+- TS_USERSPACE=false
+- TS_TAILSCALED_EXTRA_ARGS=--tun=tailscale0
+```
+
+Newer versions of the Tailscale container image ignore `TS_USERSPACE=false` alone — the extra arg is needed to override the hardcoded `--tun=userspace-networking` flag that containerboot passes.
+
+---
+
+### Services stuck in stale network namespace after ts-infra restart
+
+When `ts-infra` restarts (new container = new network namespace), services that use `network_mode: "service:ts-infra"` keep running but are attached to the old, orphaned namespace. Symptoms: `ip addr` inside the service shows only `lo`, no `eth0` or `tailscale0`:
+
+```sh
+docker exec cloudnet-consul-1 ip addr
+# Only lo → stale namespace
+```
+
+Fix: restart all dependent services so they re-attach to the current ts-infra namespace:
+
+```sh
+docker compose up -d consul traefik-lab coredns prometheus grafana
+```
+
+---
+
+### Split DNS not pushed to clients (`lab.<ROOT_DOMAIN>` doesn't resolve)
+
+The `split` key in `headscale/config.yaml.tmpl` must be **inside** `nameservers`, not alongside it. If it is a sibling of `nameservers`, Headscale silently ignores it and clients only get the global resolvers:
+
+```yaml
+# Wrong
+dns:
+  nameservers:
+    global: [...]
+  split:             # ← sibling of nameservers
+    "lab.x.com": [...]
+
+# Correct
+dns:
+  nameservers:
+    global: [...]
+    split:           # ← nested inside nameservers
+      "lab.x.com": [...]
+```
+
+After fixing the template, re-run `./setup.sh` and restart headscale.
+
+---
+
+### `infra-vps` node not tagged — tailnet traffic blocked
+
+The ACL only opens ports 53 and 443 to nodes with `tag:infra`. If the VPS node has no tags, all tailnet traffic (DNS and HTTPS) is silently dropped. Check:
+
+```sh
+docker exec cloudnet-headscale-1 headscale nodes list
+# Tags column should show tag:infra for infra-vps
+```
+
+Fix — apply the tag manually if it is missing:
+
+```sh
+docker exec cloudnet-headscale-1 headscale nodes tag --identifier 1 --tags tag:infra
+```
+
+To avoid this on future bring-ups, create the pre-auth key with `--tags tag:infra` (already documented in the bring-up sequence above).
+
+---
+
+### iOS DNS caching causes apparent resolution failures
+
+After fixing DNS or changing tailnet configuration, iOS aggressively caches old results. Reconnecting Tailscale does not always flush the DNS cache. Symptoms: CoreDNS logs show `NOERROR` for queries from the iPhone, but Safari says the site can't be reached.
+
+Fix: force-quit the Tailscale app on the iPhone, reopen it, then try again. As a last resort, toggle Airplane Mode on and off.
+
+---
+
+### Headscale ACL: `autogroup:member` not supported
+
+Headscale does not support Tailscale's built-in `autogroup:member`. Tag owners must be explicit email addresses (matching your OIDC identity), and ACL sources must use `"*"` for "any node":
+
+```json
+// Wrong
+"tagOwners": { "tag:infra": ["autogroup:member"] }
+
+// Correct
+"tagOwners": { "tag:infra": ["you@example.com"] }
+```
+
+---
+
+### `headscale preauthkeys create --user` requires a numeric ID
+
+Newer Headscale versions changed `--user` to accept a numeric ID, not a name:
+
+```sh
+docker exec cloudnet-headscale-1 headscale users list   # get the ID
+docker exec cloudnet-headscale-1 headscale preauthkeys create --user <ID> --tags tag:infra --reusable --expiration 1h
+```
+
+---
+
+### traefik-lab has no routes despite services being in Consul
+
+If `docker logs cloudnet-traefik-lab-1` is empty and the API shows no routes, first confirm the service is actually running and its API is reachable (the Traefik container image does not include `curl`):
+
+```sh
+docker exec cloudnet-ts-infra-1 wget -qO- http://127.0.0.1:8080/api/overview
+```
+
+If the API responds with providers showing `ConsulCatalog` but routes are still missing, check that Consul itself has the services registered:
+
+```sh
+docker exec cloudnet-consul-1 curl -s http://127.0.0.1:8500/v1/catalog/services
+```
+
+If Consul is empty, the `vps-services.json` config file may not have been generated — re-run `./setup.sh`.

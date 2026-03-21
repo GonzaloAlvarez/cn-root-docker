@@ -7,6 +7,7 @@
   "acls": [
     { "action": "accept", "src": ["*"], "dst": ["tag:infra:53", "tag:infra:443"] },
     { "action": "accept", "src": ["tag:infra"], "dst": ["tag:svc:80,3000,2283"] },
+    { "action": "accept", "src": ["tag:svc"], "dst": ["tag:infra:8500"] },
     { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["tag:svc:3000,8500,9090"] }
   ]
 }
