@@ -77,3 +77,7 @@ envsubst '${ROOT_DOMAIN} ${VPS_TAILNET_IP}' \
 
 envsubst '${LAB_DOMAIN}' \
   < tailnet/consul/vps-services.json.tmpl > tailnet/consul/vps-services.json
+
+mkdir -p tailnet/alertmanager
+envsubst '${SMTP_HOST} ${SMTP_PORT} ${SMTP_FROM} ${SMTP_USERNAME} ${SMTP_PASSWORD} ${ALERT_EMAIL}' \
+  < tailnet/alertmanager/alertmanager.yml.tmpl > tailnet/alertmanager/alertmanager.yml

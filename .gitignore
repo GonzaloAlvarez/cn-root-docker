@@ -4,3 +4,4 @@ headscale/config.yaml
 tailnet/coredns/Corefile
 tailnet/coredns/db.lab.domain
 tailnet/consul/vps-services.json
+tailnet/alertmanager/alertmanager.yml

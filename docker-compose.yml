@@ -114,6 +114,67 @@ services:
       - ts-infra
     restart: unless-stopped
 
+  node-exporter:
+    image: prom/node-exporter:latest
+    network_mode: "service:ts-infra"
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    depends_on:
+      - ts-infra
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    network_mode: "service:ts-infra"
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - "./tailnet/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"
+      - "alertmanager_data:/alertmanager"
+    depends_on:
+      - ts-infra
+    restart: unless-stopped
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    network_mode: "service:ts-infra"
+    command: ["-H", "unix:///var/run/docker.sock"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer_data:/data
+    depends_on:
+      - ts-infra
+    restart: unless-stopped
+
+  trala:
+    image: ghcr.io/dannybouwers/trala:latest
+    network_mode: "service:ts-infra"
+    environment:
+      - TRAEFIK_API_HOST=http://127.0.0.1:8080
+      - PORT=3001
+    depends_on:
+      - ts-infra
+      - traefik-lab
+    restart: unless-stopped
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    command:
+      - "--monitor-only"
+      - "--schedule=0 0 3 * * *"
+      - "--notification-url=smtp://${SMTP_USERNAME}:${SMTP_PASSWORD}@${SMTP_HOST}:${SMTP_PORT}/?from=${SMTP_FROM}&to=${ALERT_EMAIL}&starttls=yes"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v2.55.0
     network_mode: "service:ts-infra"
@@ -123,6 +184,7 @@ services:
       - "--storage.tsdb.retention.time=15d"
     volumes:
       - "./tailnet/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "./tailnet/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro"
       - "prometheus_data:/prometheus"
     depends_on:
       - ts-infra
@@ -164,3 +226,5 @@ volumes:
   prometheus_data:
   grafana_data:
   loki_data:
+  alertmanager_data:
+  portainer_data:
