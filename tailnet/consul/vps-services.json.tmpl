@@ -91,6 +91,24 @@
       }
     },
     {
+      "name": "alertmanager",
+      "id": "alertmanager-vps",
+      "address": "127.0.0.1",
+      "port": 9093,
+      "tags": [
+        "traefik.enable=true",
+        "traefik.http.routers.alertmanager.rule=Host(`alertmanager.${LAB_DOMAIN}`)",
+        "traefik.http.routers.alertmanager.entrypoints=websecure",
+        "traefik.http.routers.alertmanager.tls=true",
+        "traefik.http.routers.alertmanager.tls.certresolver=dns"
+      ],
+      "check": {
+        "tcp": "127.0.0.1:9093",
+        "interval": "10s",
+        "deregister_critical_service_after": "2m"
+      }
+    },
+    {
       "name": "home",
       "id": "home-vps",
       "address": "127.0.0.1",

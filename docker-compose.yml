@@ -137,6 +137,7 @@ services:
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
       - "--storage.path=/alertmanager"
+      - "--web.external-url=https://alertmanager.${LAB_DOMAIN}"
     volumes:
       - "./tailnet/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"
       - "alertmanager_data:/alertmanager"
