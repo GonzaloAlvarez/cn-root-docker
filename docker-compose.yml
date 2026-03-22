@@ -2,7 +2,7 @@ services:
   traefik-public:
     image: traefik:v3.6.9
     command:
-      - "--log.level=DEBUG"
+      - "--log.level=INFO"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.websecure.address=:443"
@@ -146,7 +146,7 @@ services:
   portainer:
     image: portainer/portainer-ce:latest
     network_mode: "service:ts-infra"
-    command: ["-H", "unix:///var/run/docker.sock"]
+    command: [ "-H", "unix:///var/run/docker.sock" ]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - portainer_data:/data
@@ -197,7 +197,7 @@ services:
   loki:
     image: grafana/loki:3.4.2
     network_mode: "service:ts-infra"
-    command: ["-config.file=/etc/loki/loki.yml"]
+    command: [ "-config.file=/etc/loki/loki.yml" ]
     volumes:
       - "./tailnet/loki/loki.yml:/etc/loki/loki.yml:ro"
       - "loki_data:/loki"
