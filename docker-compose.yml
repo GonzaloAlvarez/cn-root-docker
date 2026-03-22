@@ -69,6 +69,7 @@ services:
     network_mode: "service:ts-infra"
     command:
       - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.traefik.address=:8888"
       - "--api=true"
       - "--api.dashboard=true"
       - "--api.insecure=true"
@@ -156,9 +157,11 @@ services:
 
   trala:
     image: ghcr.io/dannybouwers/trala:latest
+    network_mode: "service:ts-infra"
     environment:
-      - TRAEFIK_API_HOST=http://ts-infra:8080
+      - TRAEFIK_API_HOST=http://127.0.0.1:8888
     depends_on:
+      - ts-infra
       - traefik-lab
     restart: unless-stopped
 

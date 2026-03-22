@@ -22,7 +22,7 @@
       "name": "traefik-dashboard",
       "id": "traefik-dashboard-vps",
       "address": "127.0.0.1",
-      "port": 8080,
+      "port": 8888,
       "tags": [
         "traefik.enable=true",
         "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${LAB_DOMAIN}`)",
@@ -31,7 +31,7 @@
         "traefik.http.routers.traefik-dashboard.tls.certresolver=dns"
       ],
       "check": {
-        "tcp": "127.0.0.1:8080",
+        "tcp": "127.0.0.1:8888",
         "interval": "10s",
         "deregister_critical_service_after": "2m"
       }
@@ -93,7 +93,7 @@
     {
       "name": "home",
       "id": "home-vps",
-      "address": "trala",
+      "address": "127.0.0.1",
       "port": 8080,
       "tags": [
         "traefik.enable=true",
@@ -101,7 +101,12 @@
         "traefik.http.routers.home.entrypoints=websecure",
         "traefik.http.routers.home.tls=true",
         "traefik.http.routers.home.tls.certresolver=dns"
-      ]
+      ],
+      "check": {
+        "tcp": "127.0.0.1:8080",
+        "interval": "10s",
+        "deregister_critical_service_after": "2m"
+      }
     }
   ]
 }
