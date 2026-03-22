@@ -93,8 +93,8 @@
     {
       "name": "home",
       "id": "home-vps",
-      "address": "127.0.0.1",
-      "port": 3001,
+      "address": "trala",
+      "port": 8080,
       "tags": [
         "traefik.enable=true",
         "traefik.http.routers.home.rule=Host(`home.${LAB_DOMAIN}`)",
@@ -103,7 +103,7 @@
         "traefik.http.routers.home.tls.certresolver=dns"
       ],
       "check": {
-        "tcp": "127.0.0.1:3001",
+        "tcp": "trala:8080",
         "interval": "10s",
         "deregister_critical_service_after": "2m"
       }

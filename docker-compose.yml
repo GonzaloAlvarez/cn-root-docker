@@ -156,13 +156,9 @@ services:
 
   trala:
     image: ghcr.io/dannybouwers/trala:latest
-    network_mode: "service:ts-infra"
     environment:
-      - TRAEFIK_API_HOST=http://127.0.0.1:8080
-    volumes:
-      - ./tailnet/trala/configuration.yml:/config/configuration.yml:ro
+      - TRAEFIK_API_HOST=http://ts-infra:8080
     depends_on:
-      - ts-infra
       - traefik-lab
     restart: unless-stopped
 
