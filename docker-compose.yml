@@ -159,7 +159,8 @@ services:
     network_mode: "service:ts-infra"
     environment:
       - TRAEFIK_API_HOST=http://127.0.0.1:8080
-      - PORT=3001
+    volumes:
+      - ./tailnet/trala/configuration.yml:/config/configuration.yml:ro
     depends_on:
       - ts-infra
       - traefik-lab
@@ -173,6 +174,8 @@ services:
       - "--notification-url=smtp://${SMTP_USERNAME}:${SMTP_PASSWORD}@${SMTP_HOST}:${SMTP_PORT}/?from=${SMTP_FROM}&to=${ALERT_EMAIL}&starttls=yes"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DOCKER_API_VERSION=1.45
     restart: unless-stopped
 
   prometheus:
