@@ -9,6 +9,6 @@
     { "action": "accept", "src": ["tag:infra"], "dst": ["tag:svc:*"] },
     { "action": "accept", "src": ["tag:svc"], "dst": ["tag:infra:8500"] },
     { "action": "accept", "src": ["tag:svc"], "dst": ["tag:infra:3100"] },
-    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["tag:svc:3000,8500,9090"] }
+    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["tag:svc:*"] }
   ]
 }
