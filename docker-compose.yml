@@ -58,7 +58,7 @@ services:
       - TS_HOSTNAME=infra-vps
       - TS_ACCEPT_DNS=true
       - TS_AUTH_ONCE=true
-      - TS_EXTRA_ARGS=--login-server=https://${HEADSCALE_DOMAIN}
+      - TS_EXTRA_ARGS=--login-server=https://${HEADSCALE_DOMAIN} --accept-routes=true
       - SSL_CERT_DIR=${SSL_CERT_DIR}
       - TS_USERSPACE=false
       - TS_TAILSCALED_EXTRA_ARGS=--tun=tailscale0
