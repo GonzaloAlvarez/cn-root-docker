@@ -236,6 +236,32 @@ services:
       - prometheus
     restart: unless-stopped
 
+  ts-infra-watchdog:
+    image: docker:cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PWD}:${PWD}
+    working_dir: ${PWD}
+    command: >
+      sh -c '
+        apk add --no-cache docker-cli-compose >/dev/null;
+        echo "[watchdog] ready, polling ts-infra every 10s";
+        LAST="";
+        while true; do
+          CUR=$$(docker inspect cloudnet-ts-infra-1 --format "{{.State.StartedAt}}" 2>/dev/null || true);
+          if [ -n "$$CUR" ] && [ -n "$$LAST" ] && [ "$$CUR" != "$$LAST" ]; then
+            echo "[watchdog] ts-infra restarted (was $$LAST, now $$CUR), recreating sidecars";
+            docker compose -p cloudnet up -d --force-recreate --no-deps \
+              traefik-lab consul coredns alertmanager prometheus grafana loki promtail node-exporter portainer trala \
+              && echo "[watchdog] sidecars recreated" \
+              || echo "[watchdog] recreate failed";
+          fi;
+          LAST="$$CUR";
+          sleep 10;
+        done
+      '
+    restart: unless-stopped
+
 volumes:
   headscale_data:
   traefik_public_acme:
