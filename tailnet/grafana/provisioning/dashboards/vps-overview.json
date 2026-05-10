@@ -368,23 +368,30 @@
     {
       "id": 17,
       "type": "stat",
-      "title": "Consul services (catalog)",
+      "title": "Consul cluster",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 0, "y": 38, "w": 6, "h": 6 },
       "targets": [
-        { "expr": "consul_catalog_service_node_healthy", "refId": "A", "legendFormat": "{{service_name}} {{status}}", "instant": true }
+        { "expr": "consul_consul_members_servers", "refId": "A", "legendFormat": "servers" },
+        { "expr": "consul_consul_members_clients", "refId": "B", "legendFormat": "clients" },
+        { "expr": "consul_autopilot_healthy",      "refId": "C", "legendFormat": "autopilot ok" }
       ],
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] },
-          "mappings": [
-            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
-          ]
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
         },
-        "overrides": []
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "autopilot ok" },
+            "properties": [
+              { "id": "mappings", "value": [ { "type": "value", "options": { "0": { "text": "BAD", "color": "red" }, "1": { "text": "OK", "color": "green" } } } ] },
+              { "id": "color", "value": { "mode": "thresholds" } },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }
+            ]
+          }
+        ]
       },
       "options": {
-        "colorMode": "background",
+        "colorMode": "value",
         "graphMode": "none",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "value_and_name"
@@ -393,17 +400,16 @@
     {
       "id": 18,
       "type": "timeseries",
-      "title": "Consul critical service-checks (over time)",
+      "title": "Consul catalog activity (queries/sec)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 6, "y": 38, "w": 18, "h": 6 },
       "targets": [
-        { "expr": "sum(consul_health_service_status{status=\"critical\"})", "refId": "A", "legendFormat": "critical" },
-        { "expr": "sum(consul_health_service_status{status=\"warning\"})", "refId": "B", "legendFormat": "warning" },
-        { "expr": "sum(consul_health_service_status{status=\"passing\"})", "refId": "C", "legendFormat": "passing" }
+        { "expr": "sum(rate(consul_catalog_register_count[5m]))",   "refId": "A", "legendFormat": "registers" },
+        { "expr": "sum(rate(consul_catalog_deregister_count[5m]))", "refId": "B", "legendFormat": "deregisters" }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "ops",
           "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" }
         },
         "overrides": []
@@ -428,7 +434,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 0, "y": 45, "w": 6, "h": 6 },
       "targets": [
-        { "expr": "sum(ALERTS{alertstate=\"firing\"})", "refId": "A", "legendFormat": "firing" }
+        { "expr": "sum(ALERTS{alertstate=\"firing\"}) or vector(0)", "refId": "A", "legendFormat": "firing" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -439,7 +445,11 @@
               { "color": "yellow", "value": 1 },
               { "color": "red", "value": 3 }
             ]
-          }
+          },
+          "links": [
+            { "title": "Open Alertmanager UI", "url": "https://alertmanager.lab.gn.al", "targetBlank": true },
+            { "title": "Open Prometheus alerts page", "url": "https://prometheus.lab.gn.al/alerts", "targetBlank": true }
+          ]
         },
         "overrides": []
       },
@@ -474,6 +484,54 @@
         "graphMode": "none",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 28,
+      "type": "table",
+      "title": "Firing alerts (details)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 51, "w": 24, "h": 7 },
+      "targets": [
+        {
+          "expr": "ALERTS{alertstate=\"firing\"}",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "Value": true, "__name__": true, "alertstate": true },
+            "indexByName": { "alertname": 0, "severity": 1, "job": 2, "instance": 3, "service_name": 4, "status": 5 },
+            "renameByName": {}
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "left", "displayMode": "auto", "filterable": true },
+          "links": [
+            { "title": "Silence in Alertmanager", "url": "https://alertmanager.lab.gn.al/#/silences/new?filter=%7Balertname%3D%22${__data.fields.alertname}%22%7D", "targetBlank": true }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "severity" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } },
+              { "id": "mappings", "value": [
+                { "type": "value", "options": { "critical": { "color": "red", "index": 0 }, "warning": { "color": "yellow", "index": 1 } } }
+              ] }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": { "enablePagination": false, "show": false }
       }
     },
     {

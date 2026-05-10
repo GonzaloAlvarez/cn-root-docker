@@ -33,45 +33,11 @@
       "panels": []
     },
     {
-      "id": 2,
-      "type": "stat",
-      "title": "All services (Prometheus targets)",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 1, "w": 12, "h": 5 },
-      "targets": [
-        { "expr": "up", "refId": "A", "legendFormat": "{{job}}", "instant": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": { "text": "DOWN", "color": "red" },
-                "1": { "text": "UP", "color": "green" }
-              }
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "textMode": "value_and_name"
-      }
-    },
-    {
       "id": 3,
       "type": "stat",
-      "title": "HA service health (specific)",
+      "title": "HA service health",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 12, "y": 1, "w": 12, "h": 5 },
+      "gridPos": { "x": 0, "y": 1, "w": 24, "h": 5 },
       "targets": [
         { "expr": "consul_health_service_status{service_name=\"homeassistant\",status=\"passing\"}", "refId": "A", "legendFormat": "consul: homeassistant", "instant": true },
         { "expr": "up{job=\"homeiot-node\"}", "refId": "B", "legendFormat": "host node-exporter", "instant": true },
