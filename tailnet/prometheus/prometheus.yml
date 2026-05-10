@@ -47,9 +47,13 @@ scrape_configs:
         labels:
           host: homeiot
 
+  # ts-infra's tailscaled overwrites /etc/resolv.conf with MagicDNS, so
+  # docker-bridge service names don't resolve from prometheus's namespace
+  # (it inherits ts-infra's). extra_hosts can't be used on a container with
+  # network_mode: service:X. Targeting headscale's bridge IP directly.
   - job_name: headscale
     static_configs:
-      - targets: ["headscale:9090"]
+      - targets: ["172.18.0.5:9090"]
 
   - job_name: loki
     static_configs:
