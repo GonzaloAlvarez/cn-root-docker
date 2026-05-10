@@ -7,7 +7,8 @@
 http:
   routers:
     k8s-wildcard:
-      rule: "HostRegexp(`{subdomain:[a-z0-9-]+}.lab.gn.al`)"
+      # Traefik v3 HostRegexp uses Go regexp syntax (not v2's {var:re} placeholders).
+      rule: "HostRegexp(`^[a-z0-9-]+\\.lab\\.gn\\.al$`)"
       service: k8s-cluster
       priority: 1   # lower than per-service Consul-derived routes (default 100)
       entryPoints:
