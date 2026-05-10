@@ -22,7 +22,7 @@ groups:
   - name: resources
     rules:
       - alert: HighCPU
-        expr: (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))) * 100 > 90
+        expr: (1 - avg by (instance)(rate(node_cpu_seconds_total{instance="127.0.0.1:9100",mode="idle"}[5m]))) * 100 > 90
         for: 5m
         labels:
           severity: warning
@@ -31,7 +31,7 @@ groups:
           description: "CPU usage has been above 90% for more than 5 minutes (current: {{ $value | printf \"%.1f\" }}%)."
 
       - alert: HighMemory
-        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 85
+        expr: (1 - node_memory_MemAvailable_bytes{instance="127.0.0.1:9100"} / node_memory_MemTotal_bytes{instance="127.0.0.1:9100"}) * 100 > 85
         for: 5m
         labels:
           severity: warning
@@ -40,10 +40,48 @@ groups:
           description: "Memory usage has been above 85% for more than 5 minutes (current: {{ $value | printf \"%.1f\" }}%)."
 
       - alert: DiskSpaceLow
-        expr: (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 > 80
+        expr: (1 - node_filesystem_avail_bytes{instance="127.0.0.1:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="127.0.0.1:9100",mountpoint="/"}) * 100 > 80
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "VPS disk space is running low"
           description: "Disk usage on / has been above 80% for more than 5 minutes (current: {{ $value | printf \"%.1f\" }}%)."
+
+  - name: homeiot
+    rules:
+      - alert: HomeIoTDiskSpaceLow
+        expr: (1 - node_filesystem_avail_bytes{instance="ha.ts.gn.al:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="ha.ts.gn.al:9100",mountpoint="/"}) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "homeiot disk usage high"
+          description: "/ on homeiot is {{ $value | printf \"%.1f\" }}% full."
+
+      - alert: HomeIoTDiskSpaceCritical
+        expr: (1 - node_filesystem_avail_bytes{instance="ha.ts.gn.al:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="ha.ts.gn.al:9100",mountpoint="/"}) * 100 > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "homeiot disk almost full"
+          description: "/ on homeiot is {{ $value | printf \"%.1f\" }}% full — services may fail."
+
+      - alert: HomeIoTHighCPU
+        expr: (1 - avg by (instance)(rate(node_cpu_seconds_total{instance="ha.ts.gn.al:9100",mode="idle"}[5m]))) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "homeiot CPU high"
+          description: "homeiot CPU above 90% for 10m (current: {{ $value | printf \"%.1f\" }}%)."
+
+      - alert: HomeIoTHighMemory
+        expr: (1 - node_memory_MemAvailable_bytes{instance="ha.ts.gn.al:9100"} / node_memory_MemTotal_bytes{instance="ha.ts.gn.al:9100"}) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "homeiot memory high"
+          description: "homeiot memory above 85% for 10m (current: {{ $value | printf \"%.1f\" }}%)."
