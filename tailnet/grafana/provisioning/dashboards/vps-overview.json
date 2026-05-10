@@ -250,42 +250,40 @@
     {
       "id": 11,
       "type": "stat",
-      "title": "Headscale process",
+      "title": "Tailnet nodes",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 0, "y": 22, "w": 6, "h": 6 },
       "targets": [
-        { "expr": "up{job=\"headscale\"}", "refId": "A", "legendFormat": "up" },
-        { "expr": "process_resident_memory_bytes{job=\"headscale\"}", "refId": "B", "legendFormat": "rss" },
-        { "expr": "rate(process_cpu_seconds_total{job=\"headscale\"}[5m])", "refId": "C", "legendFormat": "cpu" }
+        { "expr": "headscale_nodestore_nodes_total", "refId": "A", "legendFormat": "nodes" }
       ],
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
         },
-        "overrides": [
-          { "matcher": { "id": "byName", "options": "rss" }, "properties": [{ "id": "unit", "value": "bytes" }] },
-          { "matcher": { "id": "byName", "options": "cpu" }, "properties": [{ "id": "unit", "value": "percentunit" }] }
-        ]
+        "overrides": []
       },
       "options": {
         "colorMode": "value",
-        "graphMode": "none",
+        "graphMode": "area",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "textMode": "value_and_name"
+        "textMode": "value"
       }
     },
     {
       "id": 12,
       "type": "timeseries",
-      "title": "Headscale HTTP requests/s (by route, code)",
+      "title": "Headscale map-response rate (poll activity)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 6, "y": 22, "w": 18, "h": 6 },
       "targets": [
-        { "expr": "sum by (path,code)(rate(http_duration_seconds_count{job=\"headscale\"}[5m]))", "refId": "A", "legendFormat": "{{path}} ({{code}})" }
+        { "expr": "rate(headscale_mapresponse_sent_total[5m])",      "refId": "A", "legendFormat": "sent" },
+        { "expr": "rate(headscale_mapresponse_generated_total[5m])", "refId": "B", "legendFormat": "generated" },
+        { "expr": "rate(headscale_mapresponse_endpoint_updates_total[5m])", "refId": "C", "legendFormat": "endpoint updates" }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps",
+          "unit": "ops",
           "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10, "showPoints": "never" }
         },
         "overrides": []
