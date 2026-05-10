@@ -16,13 +16,6 @@ common:
     kvstore:
       store: inmemory
 
-ingester:
-  # When unordered_writes is true, the per-stream "too far behind"
-  # window is tied to chunk_idle_period (default 1h). Bumping it to
-  # match the out-of-order window we want to accept.
-  chunk_idle_period: 720h
-  max_chunk_age: 720h
-
 schema_config:
   configs:
     - from: 2020-10-24
