@@ -9,6 +9,20 @@
   "time": { "from": "now-3h", "to": "now" },
   "templating": { "list": [] },
   "annotations": { "list": [] },
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": ["homelab"],
+      "targetBlank": false,
+      "title": "Dashboards",
+      "tooltip": "",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
   "panels": [
     {
       "id": 1,
@@ -531,6 +545,34 @@
       "options": {
         "tooltip": { "mode": "multi", "sort": "desc" },
         "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false }
+      }
+    },
+    {
+      "id": 26,
+      "type": "row",
+      "title": "Logs",
+      "gridPos": { "x": 0, "y": 58, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 27,
+      "type": "logs",
+      "title": "Headscale recent logs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 0, "y": 59, "w": 24, "h": 10 },
+      "targets": [
+        { "expr": "{container=\"cloudnet-headscale-1\"}", "refId": "A" }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
       }
     }
   ]

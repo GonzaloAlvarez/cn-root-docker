@@ -205,6 +205,21 @@ services:
       - ts-infra
     restart: unless-stopped
 
+  promtail:
+    image: grafana/promtail:3.4.2
+    network_mode: "service:ts-infra"
+    command: ["-config.file=/etc/promtail/promtail.yml"]
+    volumes:
+      - "./tailnet/promtail/promtail.yml:/etc/promtail/promtail.yml:ro"
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log/journal:/var/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+      - /run/systemd/journal:/run/systemd/journal:ro
+    depends_on:
+      - ts-infra
+      - loki
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:11.2.0
     network_mode: "service:ts-infra"

@@ -1,0 +1,39 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://127.0.0.1:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: vps-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: [__meta_docker_container_label_com_docker_compose_project]
+        regex: cloudnet
+        action: keep
+      - source_labels: [__meta_docker_container_name]
+        regex: /(.*)
+        target_label: container
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        target_label: service
+      - replacement: vps
+        target_label: host
+
+  - job_name: host-journal
+    journal:
+      max_age: 12h
+      path: /var/log/journal
+      labels:
+        job: host-journal
+        host: vps
+    relabel_configs:
+      - source_labels: ['__journal__systemd_unit']
+        target_label: unit
+      - source_labels: ['__journal__hostname']
+        target_label: hostname
