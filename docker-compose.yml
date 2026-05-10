@@ -185,6 +185,7 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-remote-write-receiver"   # accept remote_write from cluster Prometheus
     volumes:
       - "./tailnet/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
       - "./tailnet/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro"

@@ -1,7 +1,7 @@
 {
-  "uid": "vaultwarden",
-  "title": "Vaultwarden",
-  "tags": ["vaultwarden", "homelab"],
+  "uid": "homeassistant",
+  "title": "Home Assistant",
+  "tags": ["homeassistant", "homelab"],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
@@ -69,49 +69,35 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "Last successful S3 backup",
-      "datasource": { "type": "loki", "uid": "loki" },
+      "title": "HA service health (specific)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 12, "y": 1, "w": 12, "h": 5 },
       "targets": [
-        {
-          "expr": "sum(count_over_time({container=\"cn-vaultwarden-backup-1\"} |= \"Uploaded\" |= \"S3\" [30d]))",
-          "refId": "A",
-          "queryType": "instant",
-          "legendFormat": "S3 uploads (30d)"
-        },
-        {
-          "expr": "sum(count_over_time({container=\"cn-vaultwarden-backup-1\"} |= \"Uploaded\" |= \"WebDAV\" [30d]))",
-          "refId": "B",
-          "queryType": "instant",
-          "legendFormat": "WebDAV uploads (30d)"
-        },
-        {
-          "expr": "sum(count_over_time({container=\"cn-vaultwarden-backup-1\"} |= \"level=ERROR\" [30d]))",
-          "refId": "C",
-          "queryType": "instant",
-          "legendFormat": "errors (30d)"
-        }
+        { "expr": "consul_health_service_status{service_name=\"homeassistant\",status=\"passing\"}", "refId": "A", "legendFormat": "consul: homeassistant", "instant": true },
+        { "expr": "up{job=\"homeiot-node\"}", "refId": "B", "legendFormat": "host node-exporter", "instant": true },
+        { "expr": "up{job=\"traefik\"}", "refId": "C", "legendFormat": "VPS traefik", "instant": true }
       ],
       "fieldConfig": {
         "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "DOWN", "color": "red" },
+                "1": { "text": "UP", "color": "green" }
+              }
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "green", "value": null }]
+            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
           }
         },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "errors (30d)" },
-            "properties": [
-              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } },
-              { "id": "color", "value": { "mode": "thresholds" } }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
+        "colorMode": "background",
+        "graphMode": "none",
         "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
         "textMode": "value_and_name"
       }
@@ -119,7 +105,7 @@
     {
       "id": 4,
       "type": "row",
-      "title": "Host (passwords.lan)",
+      "title": "Host (homeiot.lan)",
       "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 },
       "collapsed": false,
       "panels": []
@@ -131,7 +117,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 0, "y": 7, "w": 6, "h": 6 },
       "targets": [
-        { "expr": "(1 - avg by (instance)(rate(node_cpu_seconds_total{instance=\"vault.ts.gn.al:9100\",mode=\"idle\"}[5m]))) * 100", "refId": "A", "legendFormat": "CPU" }
+        { "expr": "(1 - avg by (instance)(rate(node_cpu_seconds_total{instance=\"ha.ts.gn.al:9100\",mode=\"idle\"}[5m]))) * 100", "refId": "A", "legendFormat": "CPU" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -155,7 +141,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 6, "y": 7, "w": 6, "h": 6 },
       "targets": [
-        { "expr": "(1 - node_memory_MemAvailable_bytes{instance=\"vault.ts.gn.al:9100\"} / node_memory_MemTotal_bytes{instance=\"vault.ts.gn.al:9100\"}) * 100", "refId": "A", "legendFormat": "Memory" }
+        { "expr": "(1 - node_memory_MemAvailable_bytes{instance=\"ha.ts.gn.al:9100\"} / node_memory_MemTotal_bytes{instance=\"ha.ts.gn.al:9100\"}) * 100", "refId": "A", "legendFormat": "Memory" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -179,7 +165,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 12, "y": 7, "w": 6, "h": 6 },
       "targets": [
-        { "expr": "(1 - node_filesystem_avail_bytes{instance=\"vault.ts.gn.al:9100\",mountpoint=\"/\"} / node_filesystem_size_bytes{instance=\"vault.ts.gn.al:9100\",mountpoint=\"/\"}) * 100", "refId": "A", "legendFormat": "/" }
+        { "expr": "(1 - node_filesystem_avail_bytes{instance=\"ha.ts.gn.al:9100\",mountpoint=\"/\"} / node_filesystem_size_bytes{instance=\"ha.ts.gn.al:9100\",mountpoint=\"/\"}) * 100", "refId": "A", "legendFormat": "/" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -203,9 +189,9 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 18, "y": 7, "w": 6, "h": 6 },
       "targets": [
-        { "expr": "node_load1{instance=\"vault.ts.gn.al:9100\"}",  "refId": "A", "legendFormat": "1m" },
-        { "expr": "node_load5{instance=\"vault.ts.gn.al:9100\"}",  "refId": "B", "legendFormat": "5m" },
-        { "expr": "node_load15{instance=\"vault.ts.gn.al:9100\"}", "refId": "C", "legendFormat": "15m" }
+        { "expr": "node_load1{instance=\"ha.ts.gn.al:9100\"}",  "refId": "A", "legendFormat": "1m" },
+        { "expr": "node_load5{instance=\"ha.ts.gn.al:9100\"}",  "refId": "B", "legendFormat": "5m" },
+        { "expr": "node_load15{instance=\"ha.ts.gn.al:9100\"}", "refId": "C", "legendFormat": "15m" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -231,8 +217,8 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 0, "y": 13, "w": 12, "h": 8 },
       "targets": [
-        { "expr": "rate(node_network_receive_bytes_total{instance=\"vault.ts.gn.al:9100\",device!~\"lo|docker.*|veth.*|br-.*|tailscale.*\"}[5m]) * 8", "refId": "A", "legendFormat": "rx {{device}}" },
-        { "expr": "rate(node_network_transmit_bytes_total{instance=\"vault.ts.gn.al:9100\",device!~\"lo|docker.*|veth.*|br-.*|tailscale.*\"}[5m]) * 8", "refId": "B", "legendFormat": "tx {{device}}" }
+        { "expr": "rate(node_network_receive_bytes_total{instance=\"ha.ts.gn.al:9100\",device!~\"lo|docker.*|veth.*|br-.*|tailscale.*\"}[5m]) * 8", "refId": "A", "legendFormat": "rx {{device}}" },
+        { "expr": "rate(node_network_transmit_bytes_total{instance=\"ha.ts.gn.al:9100\",device!~\"lo|docker.*|veth.*|br-.*|tailscale.*\"}[5m]) * 8", "refId": "B", "legendFormat": "tx {{device}}" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -253,8 +239,8 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 12, "y": 13, "w": 12, "h": 8 },
       "targets": [
-        { "expr": "rate(node_disk_read_bytes_total{instance=\"vault.ts.gn.al:9100\",device!~\"loop.*|dm-.*\"}[5m])", "refId": "A", "legendFormat": "read {{device}}" },
-        { "expr": "rate(node_disk_written_bytes_total{instance=\"vault.ts.gn.al:9100\",device!~\"loop.*|dm-.*\"}[5m])", "refId": "B", "legendFormat": "write {{device}}" }
+        { "expr": "rate(node_disk_read_bytes_total{instance=\"ha.ts.gn.al:9100\",device!~\"loop.*|dm-.*\"}[5m])", "refId": "A", "legendFormat": "read {{device}}" },
+        { "expr": "rate(node_disk_written_bytes_total{instance=\"ha.ts.gn.al:9100\",device!~\"loop.*|dm-.*\"}[5m])", "refId": "B", "legendFormat": "write {{device}}" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -271,7 +257,7 @@
     {
       "id": 11,
       "type": "row",
-      "title": "Vaultwarden traffic (via VPS Traefik)",
+      "title": "Home Assistant traffic (via VPS Traefik)",
       "gridPos": { "x": 0, "y": 21, "w": 24, "h": 1 },
       "collapsed": false,
       "panels": []
@@ -283,7 +269,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
       "targets": [
-        { "expr": "sum by (code)(rate(traefik_service_requests_total{service=\"vaultwarden@consulcatalog\"}[5m]))", "refId": "A", "legendFormat": "{{code}}" }
+        { "expr": "sum by (code)(rate(traefik_service_requests_total{service=\"homeassistant@consulcatalog\"}[5m]))", "refId": "A", "legendFormat": "{{code}}" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -304,9 +290,9 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum by (le)(rate(traefik_service_request_duration_seconds_bucket{service=\"vaultwarden@consulcatalog\"}[5m])))", "refId": "A", "legendFormat": "p50" },
-        { "expr": "histogram_quantile(0.95, sum by (le)(rate(traefik_service_request_duration_seconds_bucket{service=\"vaultwarden@consulcatalog\"}[5m])))", "refId": "B", "legendFormat": "p95" },
-        { "expr": "histogram_quantile(0.99, sum by (le)(rate(traefik_service_request_duration_seconds_bucket{service=\"vaultwarden@consulcatalog\"}[5m])))", "refId": "C", "legendFormat": "p99" }
+        { "expr": "histogram_quantile(0.50, sum by (le)(rate(traefik_service_request_duration_seconds_bucket{service=\"homeassistant@consulcatalog\"}[5m])))", "refId": "A", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum by (le)(rate(traefik_service_request_duration_seconds_bucket{service=\"homeassistant@consulcatalog\"}[5m])))", "refId": "B", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum by (le)(rate(traefik_service_request_duration_seconds_bucket{service=\"homeassistant@consulcatalog\"}[5m])))", "refId": "C", "legendFormat": "p99" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -331,11 +317,11 @@
     {
       "id": 15,
       "type": "logs",
-      "title": "Vaultwarden (lab) recent logs",
+      "title": "Home Assistant core (recent)",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "x": 0, "y": 31, "w": 24, "h": 10 },
       "targets": [
-        { "expr": "{container=\"cn-vaultwarden-vaultwarden-lab-1\"}", "refId": "A" }
+        { "expr": "{container=\"homeassistant\"}", "refId": "A" }
       ],
       "options": {
         "showTime": true,
@@ -351,15 +337,35 @@
     {
       "id": 16,
       "type": "logs",
-      "title": "Backup runs (cn-vaultwarden-backup-1)",
+      "title": "Hassio supervisor",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "x": 0, "y": 41, "w": 24, "h": 8 },
       "targets": [
-        { "expr": "{container=\"cn-vaultwarden-backup-1\"}", "refId": "A" }
+        { "expr": "{container=\"hassio_supervisor\"}", "refId": "A" }
       ],
       "options": {
         "showTime": true,
         "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "id": 17,
+      "type": "logs",
+      "title": "homeiot host journal (errors only)",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 0, "y": 49, "w": 24, "h": 8 },
+      "targets": [
+        { "expr": "{job=\"host-journal\",host=\"homeiot\"} |~ \"(?i)error|fail|denied\"", "refId": "A" }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
         "showCommonLabels": false,
         "wrapLogMessage": true,
         "prettifyLogMessage": false,
