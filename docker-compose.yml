@@ -189,6 +189,11 @@ services:
       - "./tailnet/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
       - "./tailnet/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro"
       - "prometheus_data:/prometheus"
+    # ts-infra's tailscaled overwrites /etc/resolv.conf with MagicDNS,
+    # so docker-bridge service names don't resolve. Pin headscale's
+    # bridge IP via /etc/hosts so the prometheus scrape works.
+    extra_hosts:
+      - "headscale:172.18.0.5"
     depends_on:
       - ts-infra
       - consul
