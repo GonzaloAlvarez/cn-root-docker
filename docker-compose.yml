@@ -169,7 +169,7 @@ services:
   watchtower:
     image: containrrr/watchtower:latest
     command:
-      - "--monitor-only"
+      - "--cleanup"
       - "--schedule=0 0 3 * * *"
       - "--notification-url=smtp://${SMTP_USERNAME}:${SMTP_PASSWORD}@${SMTP_HOST}:${SMTP_PORT}/?from=${SMTP_FROM}&to=${ALERT_EMAIL}&starttls=yes"
     volumes:
