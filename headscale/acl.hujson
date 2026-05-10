@@ -13,8 +13,8 @@
     { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["tag:svc:*"] },
     { "action": "accept", "src": ["admin@"], "dst": ["admin@:*"] },
 
-    // k8s-router advertises 10.0.0.200/27 (cluster MetalLB pool). Allow VPS Traefik
+    // k8s-router advertises 10.0.0.192/27 (cluster MetalLB pool). Allow VPS Traefik
     // and the admin user to reach the cluster ingress on HTTP/HTTPS via that route.
-    { "action": "accept", "src": ["tag:infra", "gonzaloab@gmail.com"], "dst": ["10.0.0.200/27:80,443"] }
+    { "action": "accept", "src": ["tag:infra", "gonzaloab@gmail.com"], "dst": ["10.0.0.192/27:80,443"] }
   ]
 }
