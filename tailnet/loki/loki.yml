@@ -16,6 +16,13 @@ common:
     kvstore:
       store: inmemory
 
+ingester:
+  # When unordered_writes is true, the per-stream "too far behind"
+  # window is tied to chunk_idle_period (default 1h). Bumping it to
+  # match the out-of-order window we want to accept.
+  chunk_idle_period: 720h
+  max_chunk_age: 720h
+
 schema_config:
   configs:
     - from: 2020-10-24
@@ -29,8 +36,14 @@ schema_config:
 limits_config:
   reject_old_samples: true
   reject_old_samples_max_age: 720h
+  # Allow promtail to backfill log lines that pre-date the stream's
+  # current high-watermark by up to 30 days. Without this, after a
+  # promtail outage, queued entries from earlier in the day get
+  # rejected as 'entry too far behind' even though they're well
+  # within reject_old_samples_max_age.
+  unordered_writes: true
+  max_global_streams_per_user: 50000
   # Cluster Promtail will roughly 4-5x current ingest. Bump from defaults so
   # bursts during pod startup don't get rate-limited.
   ingestion_rate_mb: 16
   ingestion_burst_size_mb: 32
-  max_global_streams_per_user: 50000
