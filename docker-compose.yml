@@ -78,6 +78,8 @@ services:
       - "--providers.consulcatalog.endpoint.address=127.0.0.1:8500"
       - "--providers.consulcatalog.exposedbydefault=false"
       - "--providers.consulcatalog.prefix=traefik"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
       - "--certificatesresolvers.dns.acme.caserver=${ACME_CASERVER}"
       - "--certificatesresolvers.dns.acme.email=${ADMIN_EMAIL}"
       - "--certificatesresolvers.dns.acme.storage=/acme/acme.json"
@@ -86,6 +88,7 @@ services:
       - "--certificatesresolvers.dns.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
     volumes:
       - "traefik_lab_acme:/acme"
+      - "./tailnet/traefik/dynamic:/etc/traefik/dynamic:ro"
     environment:
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
     depends_on:

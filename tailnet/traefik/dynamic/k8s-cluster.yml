@@ -1,0 +1,26 @@
+# Wildcard route for *.lab.gn.al → cluster ingress-nginx (10.0.0.201).
+# Reaches the cluster via the in-cluster tailscale-router subnet route
+# (10.0.0.192/27 advertised; ts-infra accepts via --accept-routes=true).
+#
+# Host header is preserved (passHostHeader: true) so the cluster's
+# ingress-nginx can route by hostname (netbox.lab.gn.al, etc.).
+http:
+  routers:
+    k8s-wildcard:
+      rule: "HostRegexp(`{subdomain:[a-z0-9-]+}.lab.gn.al`)"
+      service: k8s-cluster
+      priority: 1   # lower than per-service Consul-derived routes (default 100)
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: dns
+        domains:
+          - main: "lab.gn.al"
+            sans: ["*.lab.gn.al"]
+
+  services:
+    k8s-cluster:
+      loadBalancer:
+        passHostHeader: true   # critical: don't rewrite Host
+        servers:
+          - url: "http://10.0.0.201:80"
