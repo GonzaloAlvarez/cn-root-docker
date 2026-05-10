@@ -1,7 +1,8 @@
 {
   "tagOwners": {
-    "tag:infra": ["gonzaloab@gmail.com"],
-    "tag:svc":   ["gonzaloab@gmail.com"]
+    "tag:infra":      ["gonzaloab@gmail.com"],
+    "tag:svc":        ["gonzaloab@gmail.com"],
+    "tag:k8s-router": ["gonzaloab@gmail.com"]
   },
 
   "acls": [
@@ -10,6 +11,10 @@
     { "action": "accept", "src": ["tag:svc"], "dst": ["tag:infra:8500"] },
     { "action": "accept", "src": ["tag:svc"], "dst": ["tag:infra:3100"] },
     { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["tag:svc:*"] },
-    { "action": "accept", "src": ["admin@"], "dst": ["admin@:*"] }
+    { "action": "accept", "src": ["admin@"], "dst": ["admin@:*"] },
+
+    // k8s-router advertises 10.0.0.200/27 (cluster MetalLB pool). Allow VPS Traefik
+    // and the admin user to reach the cluster ingress on HTTP/HTTPS via that route.
+    { "action": "accept", "src": ["tag:infra", "gonzaloab@gmail.com"], "dst": ["10.0.0.200/27:80,443"] }
   ]
 }
