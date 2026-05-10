@@ -1,0 +1,40 @@
+apiVersion: 1
+
+# Cluster observability data sources. All routed through the k3s ingress-nginx
+# at 10.0.0.201 (reachable from VPS via the k8s-router subnet route on the
+# tailnet) using a Host header to select the right backend.
+
+datasources:
+  - name: Cluster Prometheus
+    uid: cluster-prometheus
+    type: prometheus
+    access: proxy
+    url: http://10.0.0.201
+    editable: false
+    jsonData:
+      httpHeaderName1: Host
+    secureJsonData:
+      httpHeaderValue1: prometheus.k8s.lan
+
+  - name: Cluster Alertmanager
+    uid: cluster-alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://10.0.0.201
+    editable: false
+    jsonData:
+      implementation: prometheus
+      httpHeaderName1: Host
+    secureJsonData:
+      httpHeaderValue1: alertmanager.k8s.lan
+
+  - name: Cluster Loki
+    uid: cluster-loki
+    type: loki
+    access: proxy
+    url: http://10.0.0.201
+    editable: false
+    jsonData:
+      httpHeaderName1: Host
+    secureJsonData:
+      httpHeaderValue1: loki.k8s.lan
