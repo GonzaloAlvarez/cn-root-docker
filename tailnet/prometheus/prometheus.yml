@@ -58,3 +58,9 @@ scrape_configs:
   - job_name: loki
     static_configs:
       - targets: ["127.0.0.1:3100"]
+
+  - job_name: vaultwarden-node
+    static_configs:
+      - targets: ["vault.ts.gn.al:9100"]
+        labels:
+          host: vaultwarden
