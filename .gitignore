@@ -1,7 +1,8 @@
 .env
 certs/
+docker-compose.override.yml
 headscale/config.yaml
+tailnet/alertmanager/alertmanager.yml
+tailnet/consul/vps-services.json
 tailnet/coredns/Corefile
 tailnet/coredns/db.lab.domain
-tailnet/consul/vps-services.json
-tailnet/alertmanager/alertmanager.yml
