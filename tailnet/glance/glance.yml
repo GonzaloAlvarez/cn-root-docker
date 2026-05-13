@@ -14,17 +14,7 @@ pages:
 
           - type: weather
             location: New York, United States
-            units: imperial
-
-          - type: rss
-            title: Headlines
-            limit: 10
-            collapse-after: 5
-            feeds:
-              - url: https://news.ycombinator.com/rss
-                title: Hacker News
-              - url: https://lobste.rs/rss
-                title: Lobsters
+            units: metric
 
       - size: full
         widgets:
@@ -75,6 +65,21 @@ pages:
                   - title: Traefik
                     url: https://traefik-dashboard.lab.gn.al
 
+          - type: group
+            widgets:
+              - type: rss
+                title: Hacker News
+                limit: 10
+                collapse-after: 5
+                feeds:
+                  - url: https://news.ycombinator.com/rss
+              - type: rss
+                title: Lobsters
+                limit: 10
+                collapse-after: 5
+                feeds:
+                  - url: https://lobste.rs/rss
+
           - type: monitor
             title: Status
             cache: 1m
@@ -89,7 +94,40 @@ pages:
                 url: https://cluster.lab.gn.al
               - title: Longhorn
                 url: https://longhorn.lab.gn.al
+                # Pass basic auth so the probe gets 200 instead of 401.
+                # Creds come from the glance container env vars
+                # LONGHORN_USER / LONGHORN_PASS (set in /opt/cloudnet/.env on
+                # the VPS — see .env.example for the placeholder).
+                check-url: https://${LONGHORN_USER}:${LONGHORN_PASS}@longhorn.lab.gn.al/
               - title: Grafana
                 url: https://grafana.lab.gn.al
               - title: Prometheus
                 url: https://prometheus.lab.gn.al
+
+          - type: videos
+            channels:
+              - UCNUzWfHUP_iXZ1GMHz8gBgw  # @ryukahr
+              - UCy0tKL1T7wFoYcxCe0xjN6Q  # @TechnologyConnections
+              - UCBJycsmduvYEL83R_U4JriQ  # @mkbhd (Marques Brownlee)
+              - UCAL3JXZSzSm8AlZyD3nQdBA  # @primitivetechnology9550
+              - UCsBjURrPoezykLs9EqgamOA  # @Fireship
+              - UC_0CVCfC_3iuHqmyClu59Uw  # @ETAPRIME
+
+      - size: small
+        widgets:
+          - type: markets
+            markets:
+              - symbol: SPY
+                name: S&P 500
+              - symbol: AXON
+                name: Axon
+              - symbol: COF
+                name: Capital One
+              - symbol: AAPL
+                name: Apple
+              - symbol: AMZN
+                name: Amazon
+              - symbol: META
+                name: Meta
+              - symbol: GOOGL
+                name: Google

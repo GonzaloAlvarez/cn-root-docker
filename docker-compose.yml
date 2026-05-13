@@ -166,6 +166,11 @@ services:
       # Glance v0.7+ reads config from /app/config/glance.yml by default
       # (was /app/glance.yml in v0.6 and earlier).
       - ./tailnet/glance/glance.yml:/app/config/glance.yml:ro
+    environment:
+      # Substituted into glance.yml at config load (Longhorn UI basic auth so
+      # the monitor probe sees 200 instead of 401).
+      - LONGHORN_USER=${LONGHORN_USER}
+      - LONGHORN_PASS=${LONGHORN_PASS}
     depends_on:
       - ts-infra
       - traefik-lab
