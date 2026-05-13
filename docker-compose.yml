@@ -163,7 +163,9 @@ services:
     image: glanceapp/glance:latest
     network_mode: "service:ts-infra"
     volumes:
-      - ./tailnet/glance/glance.yml:/app/glance.yml:ro
+      # Glance v0.7+ reads config from /app/config/glance.yml by default
+      # (was /app/glance.yml in v0.6 and earlier).
+      - ./tailnet/glance/glance.yml:/app/config/glance.yml:ro
     depends_on:
       - ts-infra
       - traefik-lab
