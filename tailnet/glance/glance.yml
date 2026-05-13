@@ -55,7 +55,7 @@ pages:
                   - title: Alertmanager
                     url: https://alertmanager.lab.gn.al
                   - title: Consul
-                    url: https://consul-ui.lab.gn.al
+                    url: https://consul.lab.gn.al/ui/
                   - title: Grafana
                     url: https://grafana.lab.gn.al
                   - title: Portainer
