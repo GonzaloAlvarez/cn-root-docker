@@ -1,0 +1,95 @@
+theme:
+  background-color: 240 8 9
+  primary-color: 43 50 70
+  contrast-multiplier: 1.1
+
+pages:
+  - name: Home
+    width: slim
+    hide-desktop-navigation: true
+    columns:
+      - size: small
+        widgets:
+          - type: calendar
+
+          - type: weather
+            location: New York, United States
+            units: imperial
+
+          - type: rss
+            title: Headlines
+            limit: 10
+            collapse-after: 5
+            feeds:
+              - url: https://news.ycombinator.com/rss
+                title: Hacker News
+              - url: https://lobste.rs/rss
+                title: Lobsters
+
+      - size: full
+        widgets:
+          - type: search
+            search-engine: duckduckgo
+            new-tab: true
+
+          - type: bookmarks
+            # ────────────────────────────────────────────────────────────────
+            # LLM-AGENT EDIT TARGET
+            # Add a new service link by appending `- title:` / `url:` under
+            # the appropriate group below. Keep alphabetical ordering within
+            # each group. The `monitor` widget further down should mirror
+            # the same URL set.
+            # ────────────────────────────────────────────────────────────────
+            groups:
+              - title: Cluster
+                color: 10 70 50
+                links:
+                  - title: Headlamp (Cluster UI)
+                    url: https://cluster.lab.gn.al
+                  - title: Longhorn
+                    url: https://longhorn.lab.gn.al
+
+              - title: Apps
+                color: 200 70 50
+                links:
+                  - title: Filebrowser
+                    url: https://filemanager.lab.gn.al
+                  - title: NetBox
+                    url: https://netbox.lab.gn.al
+                  - title: Vaultwarden
+                    url: https://passwords.lab.gn.al
+
+              - title: Infra
+                color: 280 70 50
+                links:
+                  - title: Alertmanager
+                    url: https://alertmanager.lab.gn.al
+                  - title: Consul
+                    url: https://consul-ui.lab.gn.al
+                  - title: Grafana
+                    url: https://grafana.lab.gn.al
+                  - title: Portainer
+                    url: https://portainer.lab.gn.al
+                  - title: Prometheus
+                    url: https://prometheus.lab.gn.al
+                  - title: Traefik
+                    url: https://traefik-dashboard.lab.gn.al
+
+          - type: monitor
+            title: Status
+            cache: 1m
+            sites:
+              - title: NetBox
+                url: https://netbox.lab.gn.al
+              - title: Vaultwarden
+                url: https://passwords.lab.gn.al
+              - title: Filebrowser
+                url: https://filemanager.lab.gn.al
+              - title: Headlamp
+                url: https://cluster.lab.gn.al
+              - title: Longhorn
+                url: https://longhorn.lab.gn.al
+              - title: Grafana
+                url: https://grafana.lab.gn.al
+              - title: Prometheus
+                url: https://prometheus.lab.gn.al

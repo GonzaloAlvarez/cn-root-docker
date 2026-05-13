@@ -159,11 +159,11 @@ services:
       - ts-infra
     restart: unless-stopped
 
-  trala:
-    image: ghcr.io/dannybouwers/trala:latest
+  glance:
+    image: glanceapp/glance:latest
     network_mode: "service:ts-infra"
-    environment:
-      - TRAEFIK_API_HOST=http://127.0.0.1:8888
+    volumes:
+      - ./tailnet/glance/glance.yml:/app/glance.yml:ro
     depends_on:
       - ts-infra
       - traefik-lab
@@ -255,7 +255,7 @@ services:
           if [ -n "$$CUR" ] && [ -n "$$LAST" ] && [ "$$CUR" != "$$LAST" ]; then
             echo "[watchdog] ts-infra restarted (was $$LAST, now $$CUR), recreating sidecars";
             docker compose -p cloudnet up -d --force-recreate --no-deps \
-              traefik-lab consul coredns alertmanager prometheus grafana loki promtail node-exporter portainer trala \
+              traefik-lab consul coredns alertmanager prometheus grafana loki promtail node-exporter portainer glance \
               && echo "[watchdog] sidecars recreated" \
               || echo "[watchdog] recreate failed";
           fi;
