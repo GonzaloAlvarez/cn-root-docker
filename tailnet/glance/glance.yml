@@ -63,7 +63,7 @@ pages:
                   - title: Prometheus
                     url: https://prometheus.lab.gn.al
                   - title: Traefik
-                    url: https://traefik-dashboard.lab.gn.al
+                    url: https://traefik.lab.gn.al/dashboard/
 
           - type: group
             widgets:
