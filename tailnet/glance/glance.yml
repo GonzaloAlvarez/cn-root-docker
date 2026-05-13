@@ -5,7 +5,7 @@ theme:
 
 pages:
   - name: Home
-    width: slim
+    # No `width: slim` — slim caps at 2 columns and we have 3 (small / full / small).
     hide-desktop-navigation: true
     columns:
       - size: small
