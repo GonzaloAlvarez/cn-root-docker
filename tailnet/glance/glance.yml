@@ -44,6 +44,8 @@ pages:
                 links:
                   - title: Filebrowser
                     url: https://filemanager.lab.gn.al
+                  - title: FreshRSS
+                    url: https://freshrss.lab.gn.al
                   - title: NetBox
                     url: https://netbox.lab.gn.al
                   - title: Vaultwarden
@@ -90,6 +92,8 @@ pages:
                 url: https://passwords.lab.gn.al
               - title: Filebrowser
                 url: https://filemanager.lab.gn.al
+              - title: FreshRSS
+                url: https://freshrss.lab.gn.al
               - title: Headlamp
                 url: https://cluster.lab.gn.al
               - title: Longhorn
