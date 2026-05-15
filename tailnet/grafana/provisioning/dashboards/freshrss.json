@@ -1,0 +1,385 @@
+{
+  "uid": "freshrss",
+  "title": "FreshRSS",
+  "tags": ["freshrss", "k8s", "homelab"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-3h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": ["homelab"],
+      "targetBlank": false,
+      "title": "Dashboards",
+      "tooltip": "",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "At a glance",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Pod status",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 0, "y": 1, "w": 8, "h": 5 },
+      "targets": [
+        {
+          "expr": "max(kube_pod_status_phase{namespace=\"kb-freshrss\", phase=\"Running\"})",
+          "refId": "A",
+          "legendFormat": "Running",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "DOWN", "color": "red" },
+                "1": { "text": "UP", "color": "green" }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Pod restarts (1h)",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 8, "y": 1, "w": 8, "h": 5 },
+      "targets": [
+        {
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"kb-freshrss\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "restarts",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Request rate (1m)",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 16, "y": 1, "w": 8, "h": 5 },
+      "targets": [
+        {
+          "expr": "sum(rate(nginx_ingress_controller_requests{exported_namespace=\"kb-freshrss\"}[1m]))",
+          "refId": "A",
+          "legendFormat": "req/s",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 5,
+      "type": "row",
+      "title": "Resource usage",
+      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "CPU usage",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 0, "y": 7, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum by (container) (rate(container_cpu_usage_seconds_total{namespace=\"kb-freshrss\", container=\"freshrss\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "{{container}}"
+        },
+        {
+          "expr": "max(kube_pod_container_resource_limits{namespace=\"kb-freshrss\", resource=\"cpu\"})",
+          "refId": "B",
+          "legendFormat": "limit"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "limit" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Memory working set",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 12, "y": 7, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum by (container) (container_memory_working_set_bytes{namespace=\"kb-freshrss\", container=\"freshrss\"})",
+          "refId": "A",
+          "legendFormat": "{{container}}"
+        },
+        {
+          "expr": "max(kube_pod_container_resource_limits{namespace=\"kb-freshrss\", resource=\"memory\"})",
+          "refId": "B",
+          "legendFormat": "limit"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "limit" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Storage",
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "PVC usage (bytes)",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 0, "y": 15, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "kubelet_volume_stats_used_bytes{namespace=\"kb-freshrss\"}",
+          "refId": "A",
+          "legendFormat": "{{persistentvolumeclaim}} used"
+        },
+        {
+          "expr": "kubelet_volume_stats_capacity_bytes{namespace=\"kb-freshrss\"}",
+          "refId": "B",
+          "legendFormat": "{{persistentvolumeclaim}} capacity"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 5 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 10,
+      "type": "bargauge",
+      "title": "PVC usage (%)",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 12, "y": 15, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "(kubelet_volume_stats_used_bytes{namespace=\"kb-freshrss\"} / kubelet_volume_stats_capacity_bytes{namespace=\"kb-freshrss\"}) * 100",
+          "refId": "A",
+          "legendFormat": "{{persistentvolumeclaim}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 70 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showUnfilled": true
+      }
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Ingress traffic",
+      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Requests per second by host",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 0, "y": 23, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum by (host) (rate(nginx_ingress_controller_requests{exported_namespace=\"kb-freshrss\"}[1m]))",
+          "refId": "A",
+          "legendFormat": "{{host}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "HTTP status codes",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 12, "y": 23, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(nginx_ingress_controller_requests{exported_namespace=\"kb-freshrss\"}[1m]))",
+          "refId": "A",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 50, "stacking": { "mode": "normal" } }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 14,
+      "type": "row",
+      "title": "Logs",
+      "gridPos": { "x": 0, "y": 30, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 15,
+      "type": "logs",
+      "title": "Recent errors / warnings",
+      "datasource": { "type": "loki", "uid": "cluster-loki" },
+      "gridPos": { "x": 0, "y": 31, "w": 24, "h": 10 },
+      "targets": [
+        {
+          "expr": "{namespace=\"kb-freshrss\"} |~ \"(?i)error|warning|fatal|exception\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      }
+    }
+  ]
+}
