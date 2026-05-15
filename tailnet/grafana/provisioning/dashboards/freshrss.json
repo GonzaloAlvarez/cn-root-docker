@@ -363,12 +363,313 @@
     {
       "id": 15,
       "type": "logs",
-      "title": "Recent errors / warnings",
+      "title": "Recent errors / warnings (FreshRSS pod)",
       "datasource": { "type": "loki", "uid": "cluster-loki" },
       "gridPos": { "x": 0, "y": 31, "w": 24, "h": 10 },
       "targets": [
         {
-          "expr": "{namespace=\"kb-freshrss\"} |~ \"(?i)error|warning|fatal|exception\"",
+          "expr": "{namespace=\"kb-freshrss\", pod=~\"freshrss-.*\"} |~ \"(?i)error|warning|fatal|exception\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "id": 16,
+      "type": "row",
+      "title": "Mercury Parser (Readable extension backend)",
+      "gridPos": { "x": 0, "y": 41, "w": 24, "h": 1 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 17,
+      "type": "stat",
+      "title": "Mercury pod status",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 0, "y": 42, "w": 8, "h": 5 },
+      "targets": [
+        {
+          "expr": "max(kube_pod_status_phase{namespace=\"kb-freshrss\", pod=~\"mercury-.*\", phase=\"Running\"})",
+          "refId": "A",
+          "legendFormat": "Running",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 18,
+      "type": "stat",
+      "title": "Mercury restarts (1h)",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 8, "y": 42, "w": 8, "h": 5 },
+      "targets": [
+        {
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"kb-freshrss\", pod=~\"mercury-.*\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "restarts",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "Mercury parses/min (5m avg)",
+      "datasource": { "type": "loki", "uid": "cluster-loki" },
+      "gridPos": { "x": 16, "y": 42, "w": 8, "h": 5 },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({namespace=\"kb-freshrss\", pod=~\"mercury-.*\"} |~ \"GET /parser\" [5m])) / 5",
+          "refId": "A",
+          "legendFormat": "parses/min",
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Mercury CPU usage",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 0, "y": 47, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"kb-freshrss\", container=\"mercury\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "mercury"
+        },
+        {
+          "expr": "max(kube_pod_container_resource_limits{namespace=\"kb-freshrss\", pod=~\"mercury-.*\", resource=\"cpu\"})",
+          "refId": "B",
+          "legendFormat": "limit"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "limit" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Mercury memory working set",
+      "datasource": { "type": "prometheus", "uid": "cluster-prometheus" },
+      "gridPos": { "x": 12, "y": 47, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum(container_memory_working_set_bytes{namespace=\"kb-freshrss\", container=\"mercury\"})",
+          "refId": "A",
+          "legendFormat": "mercury"
+        },
+        {
+          "expr": "max(kube_pod_container_resource_limits{namespace=\"kb-freshrss\", pod=~\"mercury-.*\", resource=\"memory\"})",
+          "refId": "B",
+          "legendFormat": "limit"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "limit" },
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Mercury parse rate (per minute)",
+      "datasource": { "type": "loki", "uid": "cluster-loki" },
+      "gridPos": { "x": 0, "y": 54, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({namespace=\"kb-freshrss\", pod=~\"mercury-.*\"} |~ \"GET /parser\" [1m]))",
+          "refId": "A",
+          "legendFormat": "parses/min"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 30 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Mercury responses by status class",
+      "datasource": { "type": "loki", "uid": "cluster-loki" },
+      "gridPos": { "x": 12, "y": 54, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({namespace=\"kb-freshrss\", pod=~\"mercury-.*\"} |~ \" 2\\\\d{2} \" [1m]))",
+          "refId": "A",
+          "legendFormat": "2xx"
+        },
+        {
+          "expr": "sum(count_over_time({namespace=\"kb-freshrss\", pod=~\"mercury-.*\"} |~ \" 4\\\\d{2} \" [1m]))",
+          "refId": "B",
+          "legendFormat": "4xx"
+        },
+        {
+          "expr": "sum(count_over_time({namespace=\"kb-freshrss\", pod=~\"mercury-.*\"} |~ \" 5\\\\d{2} \" [1m]))",
+          "refId": "C",
+          "legendFormat": "5xx"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 60, "stacking": { "mode": "normal" } }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "2xx" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byName", "options": "4xx" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }] },
+          { "matcher": { "id": "byName", "options": "5xx" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Mercury parse latency (ms)",
+      "datasource": { "type": "loki", "uid": "cluster-loki" },
+      "gridPos": { "x": 0, "y": 61, "w": 24, "h": 7 },
+      "targets": [
+        {
+          "expr": "quantile_over_time(0.5, {namespace=\"kb-freshrss\", pod=~\"mercury-.*\"} |~ \"GET /parser\" | regexp `\\\\s(?P<ms>\\\\d+\\\\.\\\\d+)\\\\s+ms` | unwrap ms [5m])",
+          "refId": "A",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "quantile_over_time(0.95, {namespace=\"kb-freshrss\", pod=~\"mercury-.*\"} |~ \"GET /parser\" | regexp `\\\\s(?P<ms>\\\\d+\\\\.\\\\d+)\\\\s+ms` | unwrap ms [5m])",
+          "refId": "B",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "max_over_time({namespace=\"kb-freshrss\", pod=~\"mercury-.*\"} |~ \"GET /parser\" | regexp `\\\\s(?P<ms>\\\\d+\\\\.\\\\d+)\\\\s+ms` | unwrap ms [5m])",
+          "refId": "C",
+          "legendFormat": "max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 25,
+      "type": "logs",
+      "title": "Mercury recent log lines",
+      "datasource": { "type": "loki", "uid": "cluster-loki" },
+      "gridPos": { "x": 0, "y": 68, "w": 24, "h": 10 },
+      "targets": [
+        {
+          "expr": "{namespace=\"kb-freshrss\", pod=~\"mercury-.*\"}",
           "refId": "A"
         }
       ],
