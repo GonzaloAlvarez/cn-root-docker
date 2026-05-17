@@ -2,7 +2,8 @@
   "tagOwners": {
     "tag:infra":      ["gonzaloab@gmail.com"],
     "tag:svc":        ["gonzaloab@gmail.com"],
-    "tag:k8s-router": ["gonzaloab@gmail.com"]
+    "tag:k8s-router": ["gonzaloab@gmail.com"],
+    "tag:exit":       ["gonzaloab@gmail.com"]
   },
 
   "acls": [
@@ -15,6 +16,12 @@
 
     // k8s-router advertises 10.0.0.192/27 (cluster MetalLB pool). Allow VPS Traefik
     // and the admin user to reach the cluster ingress on HTTP/HTTPS via that route.
-    { "action": "accept", "src": ["tag:infra", "gonzaloab@gmail.com"], "dst": ["10.0.0.192/27:80,443"] }
+    { "action": "accept", "src": ["tag:infra", "gonzaloab@gmail.com"], "dst": ["10.0.0.192/27:80,443"] },
+
+    // cn-infra exit nodes (infra-exit + infra-mullvad) on infra.lan:
+    //   - reach their SOCKS5 (1055) + HTTP-CONNECT (1056) over tailnet
+    //   - allow the operator to use them as exit nodes (autogroup:internet)
+    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["tag:exit:1055,1056"] },
+    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["autogroup:internet:*"] }
   ]
 }
