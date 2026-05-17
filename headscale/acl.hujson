@@ -26,6 +26,15 @@
     //      10.120.22.0/24 = passwords pi)
     { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["tag:exit:1055,1056"] },
     { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["autogroup:internet:*"] },
-    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["10.0.0.0/24:*", "10.1.0.0/16:*", "10.120.22.0/24:*"] }
+    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["10.0.0.0/24:*", "10.1.0.0/16:*", "10.120.22.0/24:*"] },
+
+    // When a tailnet client selects an exit node from tag:exit, the exit-node
+    // itself originates the outbound connection on behalf of the requester.
+    // Grant tag:exit egress to the same destinations the operator already has,
+    // so cn-socksnode (or any client) with exit-node=infra-exit can reach
+    // tag:svc, tag:infra, the advertised LAN ranges, and the open internet.
+    { "action": "accept", "src": ["tag:exit"], "dst": ["tag:svc:*", "tag:infra:*"] },
+    { "action": "accept", "src": ["tag:exit"], "dst": ["autogroup:internet:*"] },
+    { "action": "accept", "src": ["tag:exit"], "dst": ["10.0.0.0/24:*", "10.1.0.0/16:*", "10.120.22.0/24:*"] }
   ]
 }
