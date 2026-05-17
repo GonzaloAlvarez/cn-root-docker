@@ -3,7 +3,7 @@
     "tag:infra":      ["gonzaloab@gmail.com"],
     "tag:svc":        ["gonzaloab@gmail.com"],
     "tag:k8s-router": ["gonzaloab@gmail.com"],
-    "tag:exit":       ["gonzaloab@gmail.com"]
+    "tag:exit":       ["admin", "gonzaloab@gmail.com"]
   },
 
   "acls": [
