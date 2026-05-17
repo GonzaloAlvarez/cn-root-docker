@@ -21,7 +21,11 @@
     // cn-infra exit nodes (infra-exit + infra-mullvad) on infra.lan:
     //   - reach their SOCKS5 (1055) + HTTP-CONNECT (1056) over tailnet
     //   - allow the operator to use them as exit nodes (autogroup:internet)
+    //   - allow the operator to reach home LAN ranges that infra-exit advertises
+    //     (10.0.0.0/24 = pki/pfsense, 10.1.0.0/16 = main LAN incl. kaiser/homeiot/infra,
+    //      10.120.22.0/24 = passwords pi)
     { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["tag:exit:1055,1056"] },
-    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["autogroup:internet:*"] }
+    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["autogroup:internet:*"] },
+    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["10.0.0.0/24:*", "10.1.0.0/16:*", "10.120.22.0/24:*"] }
   ]
 }
