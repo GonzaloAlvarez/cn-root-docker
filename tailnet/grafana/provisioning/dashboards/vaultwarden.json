@@ -4,7 +4,7 @@
   "tags": ["vaultwarden", "homelab"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": { "from": "now-3h", "to": "now" },
   "templating": { "list": [] },
@@ -33,45 +33,11 @@
       "panels": []
     },
     {
-      "id": 2,
-      "type": "stat",
-      "title": "All services (Prometheus targets)",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 1, "w": 12, "h": 5 },
-      "targets": [
-        { "expr": "up", "refId": "A", "legendFormat": "{{job}}", "instant": true }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "0": { "text": "DOWN", "color": "red" },
-                "1": { "text": "UP", "color": "green" }
-              }
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "textMode": "value_and_name"
-      }
-    },
-    {
       "id": 3,
       "type": "stat",
-      "title": "Last successful S3 backup",
+      "title": "Backup health (30 days)",
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "x": 12, "y": 1, "w": 12, "h": 5 },
+      "gridPos": { "x": 0, "y": 1, "w": 24, "h": 5 },
       "targets": [
         {
           "expr": "sum(count_over_time({container=\"cn-vaultwarden-backup-1\"} |= \"Uploaded\" |= \"S3\" [30d]))",
@@ -101,8 +67,21 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "errors (30d)" },
+            "matcher": { "id": "byName", "options": "Value #A" },
             "properties": [
+              { "id": "displayName", "value": "S3 uploads" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Value #B" },
+            "properties": [
+              { "id": "displayName", "value": "WebDAV uploads" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Value #C" },
+            "properties": [
+              { "id": "displayName", "value": "Errors" },
               { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } },
               { "id": "color", "value": { "mode": "thresholds" } }
             ]
