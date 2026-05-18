@@ -4,7 +4,7 @@
   "tags": ["vaultwarden", "homelab"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
   "time": { "from": "now-3h", "to": "now" },
   "templating": { "list": [] },
@@ -330,9 +330,11 @@
     {
       "id": 16,
       "type": "logs",
-      "title": "Backup runs (cn-vaultwarden-backup-1)",
+      "title": "Backup runs (cn-vaultwarden-backup-1) — last 14 days",
+      "description": "Backup cron fires Sundays 03:00 UTC, so this panel overrides the dashboard time range to 14d to always show the most recent run.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "x": 0, "y": 41, "w": 24, "h": 8 },
+      "timeFrom": "14d",
       "targets": [
         { "expr": "{container=\"cn-vaultwarden-backup-1\"}", "refId": "A" }
       ],
