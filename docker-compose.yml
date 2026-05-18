@@ -205,6 +205,17 @@ services:
       - consul
     restart: unless-stopped
 
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    network_mode: "service:ts-infra"
+    command:
+      - "--config.file=/etc/blackbox/blackbox.yml"
+    volumes:
+      - "./tailnet/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro"
+    depends_on:
+      - ts-infra
+    restart: unless-stopped
+
   loki:
     image: grafana/loki:3.4.2
     network_mode: "service:ts-infra"

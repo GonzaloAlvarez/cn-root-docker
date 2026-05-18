@@ -64,3 +64,25 @@ scrape_configs:
       - targets: ["vault.ts.gn.al:9100"]
         labels:
           host: vaultwarden
+
+  # Blackbox HTTP probes for every k8s tailnet ingress. Probes from the
+  # ts-infra netns so traefik-lab → consul → k8s-router → MetalLB pool reflects
+  # the same path a real user takes from the tailnet.
+  - job_name: blackbox-k8s-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx_3xx_4xx]
+    static_configs:
+      - targets:
+          - https://netbox.lab.gn.al/login/
+          - https://freshrss.lab.gn.al/
+          - https://filemanager.lab.gn.al/
+          - https://cluster.lab.gn.al/
+          - https://longhorn.lab.gn.al/
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 127.0.0.1:9115
