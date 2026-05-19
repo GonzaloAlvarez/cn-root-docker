@@ -3,7 +3,8 @@
     "tag:infra":      ["gonzaloab@gmail.com"],
     "tag:svc":        ["gonzaloab@gmail.com"],
     "tag:k8s-router": ["gonzaloab@gmail.com"],
-    "tag:exit":       ["admin@", "gonzaloab@gmail.com"]
+    "tag:exit":       ["admin@", "gonzaloab@gmail.com"],
+    "tag:vpn-client": ["gonzaloab@gmail.com"]
   },
 
   "acls": [
@@ -35,6 +36,16 @@
     // tag:svc, tag:infra, the advertised LAN ranges, and the open internet.
     { "action": "accept", "src": ["tag:exit"], "dst": ["tag:svc:*", "tag:infra:*"] },
     { "action": "accept", "src": ["tag:exit"], "dst": ["autogroup:internet:*"] },
-    { "action": "accept", "src": ["tag:exit"], "dst": ["10.0.0.0/24:*", "10.1.0.0/16:*", "10.120.22.0/24:*"] }
+    { "action": "accept", "src": ["tag:exit"], "dst": ["10.0.0.0/24:*", "10.1.0.0/16:*", "10.120.22.0/24:*"] },
+
+    // cn-bittorrent on kaiser.lan — tag:vpn-client is egress-quarantined:
+    // it MUST route public-internet egress via an exit node (infra-mullvad),
+    // and is deliberately denied tag:svc:* and LAN-range access. The only
+    // tailnet peers it talks to are tag:infra (Consul self-registration on
+    // :8500, Loki log push on :3100); tag:infra reaches its qb/*arr UIs
+    // (traefik-lab via consulcatalog) on the published ports below.
+    { "action": "accept", "src": ["tag:vpn-client"], "dst": ["autogroup:internet:*"] },
+    { "action": "accept", "src": ["tag:vpn-client"], "dst": ["tag:infra:8500", "tag:infra:3100"] },
+    { "action": "accept", "src": ["tag:infra"],      "dst": ["tag:vpn-client:8080,8989,7878,9696,8686,8787"] }
   ]
 }
