@@ -51,6 +51,22 @@ pages:
                   - title: Vaultwarden
                     url: https://passwords.lab.gn.al
 
+              - title: Torrent
+                color: 340 70 50
+                links:
+                  - title: Lidarr
+                    url: https://lidarr.lab.gn.al
+                  - title: Prowlarr
+                    url: https://prowlarr.lab.gn.al
+                  - title: qBittorrent
+                    url: https://torrent.lab.gn.al
+                  - title: Radarr
+                    url: https://radarr.lab.gn.al
+                  - title: Readarr
+                    url: https://readarr.lab.gn.al
+                  - title: Sonarr
+                    url: https://sonarr.lab.gn.al
+
               - title: Infra
                 color: 280 70 50
                 links:
@@ -107,6 +123,18 @@ pages:
                 url: https://grafana.lab.gn.al
               - title: Prometheus
                 url: https://prometheus.lab.gn.al
+              - title: qBittorrent
+                url: https://torrent.lab.gn.al
+              - title: Sonarr
+                url: https://sonarr.lab.gn.al
+              - title: Radarr
+                url: https://radarr.lab.gn.al
+              - title: Prowlarr
+                url: https://prowlarr.lab.gn.al
+              - title: Lidarr
+                url: https://lidarr.lab.gn.al
+              - title: Readarr
+                url: https://readarr.lab.gn.al
 
           - type: videos
             channels:
