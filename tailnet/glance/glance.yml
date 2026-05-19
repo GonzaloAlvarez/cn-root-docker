@@ -124,17 +124,35 @@ pages:
               - title: Prometheus
                 url: https://prometheus.lab.gn.al
               - title: qBittorrent
+                # qb has no unauth health endpoint; the monitor will
+                # show "Unauthorized" while still proving the service
+                # responds, which is the most useful indicator we can
+                # get without putting credentials in this file.
                 url: https://torrent.lab.gn.al
+              # Sonarr/Radarr/Prowlarr/Lidarr's .NET reverse-proxy
+              # support only trusts loopback by default — they ignore
+              # X-Forwarded-Proto from the VPS (100.64.0.1) and emit
+              # `Location: http://...` on the root redirect, which
+              # Glance probes follow and fail (no :80 on the tailnet).
+              # Probe /ping instead — returns 200 unauth + no redirect.
+              # Readarr (`:develop`) honors X-Forwarded-Proto so /
+              # works for it, but using /ping is consistent and
+              # cheaper across all five.
               - title: Sonarr
                 url: https://sonarr.lab.gn.al
+                check-url: https://sonarr.lab.gn.al/ping
               - title: Radarr
                 url: https://radarr.lab.gn.al
+                check-url: https://radarr.lab.gn.al/ping
               - title: Prowlarr
                 url: https://prowlarr.lab.gn.al
+                check-url: https://prowlarr.lab.gn.al/ping
               - title: Lidarr
                 url: https://lidarr.lab.gn.al
+                check-url: https://lidarr.lab.gn.al/ping
               - title: Readarr
                 url: https://readarr.lab.gn.al
+                check-url: https://readarr.lab.gn.al/ping
 
           - type: videos
             channels:
