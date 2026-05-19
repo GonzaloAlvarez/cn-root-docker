@@ -24,10 +24,10 @@
     //   - allow the operator to use them as exit nodes (autogroup:internet)
     //   - allow the operator to reach home LAN ranges that infra-exit advertises
     //     (10.0.0.0/24 = pki/pfsense, 10.1.0.0/16 = main LAN incl. kaiser/homeiot/infra,
-    //      10.120.22.0/24 = passwords pi)
+    //      10.120.22.0/24 = passwords pi, 10.120.26.0/24 = raidnas)
     { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["tag:exit:1055,1056"] },
     { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["autogroup:internet:*"] },
-    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["10.0.0.0/24:*", "10.1.0.0/16:*", "10.120.22.0/24:*"] },
+    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["10.0.0.0/24:*", "10.1.0.0/16:*", "10.120.22.0/24:*", "10.120.26.0/24:*"] },
 
     // When a tailnet client selects an exit node from tag:exit, the exit-node
     // itself originates the outbound connection on behalf of the requester.
@@ -36,7 +36,13 @@
     // tag:svc, tag:infra, the advertised LAN ranges, and the open internet.
     { "action": "accept", "src": ["tag:exit"], "dst": ["tag:svc:*", "tag:infra:*"] },
     { "action": "accept", "src": ["tag:exit"], "dst": ["autogroup:internet:*"] },
-    { "action": "accept", "src": ["tag:exit"], "dst": ["10.0.0.0/24:*", "10.1.0.0/16:*", "10.120.22.0/24:*"] },
+    { "action": "accept", "src": ["tag:exit"], "dst": ["10.0.0.0/24:*", "10.1.0.0/16:*", "10.120.22.0/24:*", "10.120.26.0/24:*"] },
+
+    // raidnas (Synology DS418) sits on 10.120.26.0/24. It is NOT on the
+    // tailnet — infra-exit subnet-routes the /24. Allow tag:infra (VPS:
+    // prometheus, snmp-exporter, traefik-lab) to reach just the ports
+    // we actually use: 161=SNMP scrape, 5000=DSM HTTP, 5005=WebDAV.
+    { "action": "accept", "src": ["tag:infra"], "dst": ["10.120.26.0/24:161,5000,5005"] },
 
     // cn-bittorrent on kaiser.lan — tag:vpn-client is egress-quarantined:
     // it MUST route public-internet egress via an exit node (infra-mullvad),
