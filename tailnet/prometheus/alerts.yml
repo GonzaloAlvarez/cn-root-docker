@@ -85,3 +85,31 @@ groups:
         annotations:
           summary: "homeiot memory high"
           description: "homeiot memory above 85% for 10m (current: {{ $value | printf \"%.1f\" }}%)."
+
+  # raidnas (Synology DS418) — SNMP-derived storage health. Metric names
+  # below assume the thin synology module in tailnet/snmp-exporter/snmp.yml
+  # (raw enterprise OIDs walked). If snmp.yml is later upgraded to the
+  # full prometheus/snmp_exporter generated module, the metric names will
+  # change (e.g. `synology_disk_status` instead of `enterprises_6574_*`)
+  # and the expressions below must be re-pointed. Confirm names via:
+  #   docker exec cloudnet-snmp-exporter-1 wget -qO- \
+  #     "http://127.0.0.1:9116/snmp?module=synology&target=10.120.26.20" | head -50
+  - name: raidnas
+    rules:
+      - alert: RaidnasUnreachable
+        expr: up{job="raidnas-snmp"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "raidnas SNMP unreachable"
+          description: "snmp-exporter scrape of raidnas (10.120.26.20:161) has failed for more than 3 minutes. Check DSM SNMP Service is enabled and the cn-infra subnet route is up."
+
+      - alert: RaidnasScrapeDurationHigh
+        expr: scrape_duration_seconds{job="raidnas-snmp"} > 8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "raidnas SNMP scrape is slow"
+          description: "snmp-exporter scrape of raidnas is taking >{{ $value | printf \"%.1f\" }}s — likely subnet-route slowness or NAS overload."

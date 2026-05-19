@@ -6,3 +6,4 @@ tailnet/alertmanager/alertmanager.yml
 tailnet/consul/vps-services.json
 tailnet/coredns/Corefile
 tailnet/coredns/db.lab.domain
+tailnet/snmp-exporter/snmp.yml

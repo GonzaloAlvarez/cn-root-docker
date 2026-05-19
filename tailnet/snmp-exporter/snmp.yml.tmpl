@@ -1,0 +1,35 @@
+# snmp.yml — Synology DS418 SNMP module for prom/snmp-exporter.
+#
+# This is a **minimal, hand-written walk config**, not the full upstream
+# `synology` module from prometheus/snmp_exporter's generated snmp.yml.
+# The generated one is ~30k lines and includes the OID→name lookups for
+# every Synology MIB; this one walks raw enterprise OIDs and lets Grafana
+# query them as `enterprises_6574_*`.
+#
+# To upgrade later (once internet/mib-toolchain is on hand):
+#   curl -sL https://github.com/prometheus/snmp_exporter/raw/main/snmp.yml \
+#     | yq '.modules.synology' > tailnet/snmp-exporter/synology-module.yml
+# then splice that under `modules.synology:` here.
+
+auths:
+  raidnas_v2:
+    community: ${SNMP_RAIDNAS_COMMUNITY}
+    security_level: noAuthNoPriv
+    version: 2
+
+modules:
+  synology:
+    walk:
+      # Standard MIB-2: system + interfaces + host resources.
+      - 1.3.6.1.2.1.1            # system (sysDescr, sysName, sysUpTime, ...)
+      - 1.3.6.1.2.1.2.2          # ifTable (32-bit IF counters as fallback)
+      - 1.3.6.1.2.1.25.1.1       # hrSystemUptime
+      - 1.3.6.1.2.1.25.2.3       # hrStorageTable (filesystem usage)
+      - 1.3.6.1.2.1.25.3.3       # hrProcessorTable (CPU load)
+      - 1.3.6.1.2.1.31.1.1       # ifXTable (64-bit IF counters)
+      # Synology enterprise OID — covers Synology-specific tables:
+      # disk, raid, volume, system, cooling, UPS, services.
+      - 1.3.6.1.4.1.6574
+    timeout: 5s
+    retries: 3
+    auth: raidnas_v2

@@ -81,3 +81,10 @@ envsubst '${LAB_DOMAIN}' \
 mkdir -p tailnet/alertmanager
 envsubst '${SMTP_HOST} ${SMTP_PORT} ${SMTP_FROM} ${SMTP_USERNAME} ${SMTP_PASSWORD} ${ALERT_EMAIL}' \
   < tailnet/alertmanager/alertmanager.yml.tmpl > tailnet/alertmanager/alertmanager.yml
+
+# snmp_exporter does NOT interpolate env vars inside its config; bake the
+# community string into the rendered config at deploy time.
+if [ -n "${SNMP_RAIDNAS_COMMUNITY:-}" ]; then
+  envsubst '${SNMP_RAIDNAS_COMMUNITY}' \
+    < tailnet/snmp-exporter/snmp.yml.tmpl > tailnet/snmp-exporter/snmp.yml
+fi

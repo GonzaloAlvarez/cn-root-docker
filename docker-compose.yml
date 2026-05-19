@@ -216,6 +216,25 @@ services:
       - ts-infra
     restart: unless-stopped
 
+  # SNMP-via-tailnet for raidnas (Synology DS418). Shares the ts-infra
+  # netns so the subnet route to 10.120.26.0/24 (advertised by
+  # cn-infra's infra-exit, approved in Headscale) is in scope.
+  # Prometheus scrapes this at 127.0.0.1:9116 via the relabel pattern
+  # already used for blackbox-exporter — see tailnet/prometheus/prometheus.yml.
+  snmp-exporter:
+    image: prom/snmp-exporter:v0.27.0
+    network_mode: "service:ts-infra"
+    command:
+      - "--config.file=/etc/snmp_exporter/snmp.yml"
+    volumes:
+      # snmp.yml is rendered from snmp.yml.tmpl by setup.sh (envsubst
+      # bakes in SNMP_RAIDNAS_COMMUNITY; snmp_exporter doesn't honor
+      # ${VAR} interpolation in its config).
+      - "./tailnet/snmp-exporter/snmp.yml:/etc/snmp_exporter/snmp.yml:ro"
+    depends_on:
+      - ts-infra
+    restart: unless-stopped
+
   loki:
     image: grafana/loki:3.4.2
     network_mode: "service:ts-infra"
