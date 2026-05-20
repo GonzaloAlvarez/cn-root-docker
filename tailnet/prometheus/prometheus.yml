@@ -65,6 +65,13 @@ scrape_configs:
         labels:
           host: vaultwarden
 
+  - job_name: jellyfin-node
+    static_configs:
+      - targets: ["jellyfin.ts.gn.al:9100"]
+        labels:
+          host: jellyfin
+          stack: cn-media
+
   # Blackbox HTTP probes for every k8s tailnet ingress. Probes from the
   # ts-infra netns so traefik-lab → consul → k8s-router → MetalLB pool reflects
   # the same path a real user takes from the tailnet.
