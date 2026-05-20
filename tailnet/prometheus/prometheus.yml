@@ -132,6 +132,17 @@ scrape_configs:
           stack: cn-bittorrent
           app: qbittorrent
 
+  # cn-roms — host-level metrics (ts-roms netns). RomM itself has no
+  # /metrics endpoint upstream (no prometheus_client import in
+  # backend/main.py), so this is node-exporter only for v1. Future:
+  # blackbox probe of /api/heartbeat or community exporter.
+  - job_name: roms-node
+    static_configs:
+      - targets: ["roms.ts.gn.al:9100"]
+        labels:
+          host: roms
+          stack: cn-roms
+
   # Blackbox HTTP probes for every k8s tailnet ingress. Probes from the
   # ts-infra netns so traefik-lab → consul → k8s-router → MetalLB pool reflects
   # the same path a real user takes from the tailnet.
