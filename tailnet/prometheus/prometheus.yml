@@ -72,6 +72,66 @@ scrape_configs:
           host: jellyfin
           stack: cn-media
 
+  # cn-media — jellyfin built-in Prometheus endpoint (gated by
+  # <EnableMetrics> in system.xml, served unauth on the main port).
+  - job_name: jellyfin
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["jellyfin.ts.gn.al:8096"]
+        labels:
+          host: jellyfin
+          stack: cn-media
+          app: jellyfin
+
+  # cn-bittorrent — host-level metrics (ts-torrent netns).
+  - job_name: bittorrent-node
+    static_configs:
+      - targets: ["torrent.ts.gn.al:9100"]
+        labels:
+          host: torrent
+          stack: cn-bittorrent
+
+  # cn-bittorrent — app-level via exportarr (one container per *arr,
+  # all sharing ts-torrent's netns on different ports). Ports allocated:
+  # 9707 sonarr | 9708 radarr | 9709 prowlarr | 9710 lidarr | 9711 readarr
+  - job_name: sonarr
+    static_configs:
+      - targets: ["torrent.ts.gn.al:9707"]
+        labels:
+          stack: cn-bittorrent
+          app: sonarr
+  - job_name: radarr
+    static_configs:
+      - targets: ["torrent.ts.gn.al:9708"]
+        labels:
+          stack: cn-bittorrent
+          app: radarr
+  - job_name: prowlarr
+    static_configs:
+      - targets: ["torrent.ts.gn.al:9709"]
+        labels:
+          stack: cn-bittorrent
+          app: prowlarr
+  - job_name: lidarr
+    static_configs:
+      - targets: ["torrent.ts.gn.al:9710"]
+        labels:
+          stack: cn-bittorrent
+          app: lidarr
+  - job_name: readarr
+    static_configs:
+      - targets: ["torrent.ts.gn.al:9711"]
+        labels:
+          stack: cn-bittorrent
+          app: readarr
+
+  - job_name: qbittorrent
+    static_configs:
+      - targets: ["torrent.ts.gn.al:9712"]
+        labels:
+          stack: cn-bittorrent
+          app: qbittorrent
+
   # Blackbox HTTP probes for every k8s tailnet ingress. Probes from the
   # ts-infra netns so traefik-lab → consul → k8s-router → MetalLB pool reflects
   # the same path a real user takes from the tailnet.
