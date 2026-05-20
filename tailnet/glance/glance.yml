@@ -67,6 +67,12 @@ pages:
                   - title: Sonarr
                     url: https://sonarr.lab.gn.al
 
+              - title: Media
+                color: 160 70 50
+                links:
+                  - title: Jellyfin
+                    url: https://jellyfin.lab.gn.al
+
               - title: Infra
                 color: 280 70 50
                 links:
@@ -153,6 +159,11 @@ pages:
               - title: Readarr
                 url: https://readarr.lab.gn.al
                 check-url: https://readarr.lab.gn.al/ping
+              # cn-media — jellyfin's `/` returns 302 → /web/ (200 unauth).
+              # Glance follows redirects by default, so no check-url override
+              # needed. Cheap unauth alternative: /System/Info/Public → 200 JSON.
+              - title: Jellyfin
+                url: https://jellyfin.lab.gn.al
 
           - type: videos
             channels:
