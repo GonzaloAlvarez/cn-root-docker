@@ -1040,7 +1040,7 @@
     {
       "id": 120,
       "type": "stat",
-      "title": "Prowlarr \u2014 failed indexers",
+      "title": "Prowlarr \u2014 enabled indexers",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1057,10 +1057,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "prowlarr_indexer_failed_total",
+          "expr": "prowlarr_indexer_enabled_total",
           "refId": "A",
           "instant": true,
-          "legendFormat": "Prowlarr \u2014 failed indexers"
+          "legendFormat": "Prowlarr \u2014 enabled indexers"
         }
       ],
       "fieldConfig": {
@@ -1073,10 +1073,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
               }
             ]
           }
@@ -1116,7 +1112,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "lidarr_artist_total",
+          "expr": "lidarr_artists_total",
           "refId": "A",
           "instant": true,
           "legendFormat": "Lidarr \u2014 artists"
@@ -1154,7 +1150,7 @@
     {
       "id": 122,
       "type": "stat",
-      "title": "Lidarr \u2014 albums (downloaded / missing)",
+      "title": "Lidarr \u2014 albums (total / missing)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1171,10 +1167,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "lidarr_album_downloaded_total",
+          "expr": "lidarr_albums_total",
           "refId": "A",
           "instant": true,
-          "legendFormat": "downloaded"
+          "legendFormat": "total"
         }
       ],
       "fieldConfig": {
