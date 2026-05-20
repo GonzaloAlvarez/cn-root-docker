@@ -52,8 +52,9 @@
     // (traefik-lab via consulcatalog) on the published ports below.
     { "action": "accept", "src": ["tag:vpn-client"], "dst": ["autogroup:internet:*"] },
     { "action": "accept", "src": ["tag:vpn-client"], "dst": ["tag:infra:8500", "tag:infra:3100"] },
-    { "action": "accept", "src": ["tag:infra"],      "dst": ["tag:vpn-client:8080,8989,7878,9696,8686,8787,9707,9708,9709,9710,9711,9712"] }
-    // 9707-9711: exportarr (sonarr/radarr/prowlarr/lidarr/readarr).
-    // 9712: qbittorrent-exporter. All scraped by VPS Prometheus.
+    { "action": "accept", "src": ["tag:infra"],      "dst": ["tag:vpn-client:8080,8989,7878,9696,8686,8787,9100,9707,9708,9709,9710,9711,9712"] }
+    // 9100: node-exporter. 9707-9711: exportarr (sonarr/radarr/prowlarr/
+    // lidarr/readarr). 9712: qbittorrent-exporter. All scraped by VPS
+    // Prometheus.
   ]
 }
