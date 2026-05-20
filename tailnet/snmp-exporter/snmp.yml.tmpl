@@ -32,4 +32,7 @@ modules:
       - 1.3.6.1.4.1.6574
     timeout: 5s
     retries: 3
-    auth: raidnas_v2
+    # NOTE: snmp_exporter ≥ 0.25 split the auth out of modules — see
+    # auth-split-migration.md. Pass `?auth=raidnas_v2` as a query
+    # parameter at scrape time instead. The Prometheus scrape job
+    # (raidnas-snmp in tailnet/prometheus/prometheus.yml) does this.

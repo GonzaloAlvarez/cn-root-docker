@@ -89,10 +89,13 @@ scrape_configs:
 
   # raidnas (Synology DS418) — SNMP scrape via subnet route. snmp-exporter
   # shares ts-infra's netns (same indirection pattern as blackbox above).
+  # `auth` is a query-parameter selector for snmp_exporter ≥ 0.25 — picks
+  # the `raidnas_v2` block under `auths:` in tailnet/snmp-exporter/snmp.yml.
   - job_name: raidnas-snmp
     metrics_path: /snmp
     params:
       module: [synology]
+      auth: [raidnas_v2]
     static_configs:
       - targets: ["10.120.26.20"]
         labels:
