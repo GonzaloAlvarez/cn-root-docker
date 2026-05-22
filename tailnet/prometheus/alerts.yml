@@ -113,3 +113,31 @@ groups:
         annotations:
           summary: "raidnas SNMP scrape is slow"
           description: "snmp-exporter scrape of raidnas is taking >{{ $value | printf \"%.1f\" }}s — likely subnet-route slowness or NAS overload."
+
+  - name: k8s-ingress
+    rules:
+      # blackbox-k8s-http probes the 5 k8s tailnet ingresses (netbox,
+      # freshrss, filemanager, cluster, longhorn). Probe returns 0
+      # when the response code falls outside http_2xx_3xx_4xx — i.e.
+      # 5xx from the ingress, which is exactly what happens when a
+      # backend pod is in CrashLoopBackOff. This rule would have
+      # caught the FreshRSS init-container loop within 5 minutes
+      # instead of 28h. Generic — covers any future ingress added to
+      # the blackbox-k8s-http static_configs.
+      - alert: K8sIngressProbeFailed
+        expr: probe_success{job="blackbox-k8s-http"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }} ingress probe failing"
+          description: "blackbox-k8s-http returned non-2xx/3xx/4xx for >5m on {{ $labels.instance }} — backend pod likely down or unhealthy. Check `kubectl get pods -A | grep -v Running` from a working KUBECONFIG."
+
+      - alert: K8sIngressSlow
+        expr: probe_duration_seconds{job="blackbox-k8s-http"} > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} ingress probe is slow"
+          description: "blackbox-k8s-http probe of {{ $labels.instance }} taking >{{ $value | printf \"%.1f\" }}s — likely Longhorn IO contention, MetalLB path issue, or backend overload."
