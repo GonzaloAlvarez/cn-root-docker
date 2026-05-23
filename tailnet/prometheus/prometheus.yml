@@ -91,36 +91,40 @@ scrape_configs:
           host: torrent
           stack: cn-bittorrent
 
-  # cn-bittorrent — app-level via exportarr (one container per *arr,
-  # all sharing ts-torrent's netns on different ports). Ports allocated:
-  # 9707 sonarr | 9708 radarr | 9709 prowlarr | 9710 lidarr | 9711 readarr
+  # cn-bittorrent — app-level via exportarr. The *arr suite was split out
+  # to its own Tailscale sidecar (ts-arr / arr.ts.gn.al, tag:svc) so it
+  # egresses via kaiser's WAN instead of Mullvad (indexer endpoints
+  # IP-block Mullvad). Each exporter shares ts-arr's netns on its own
+  # port: 9707 sonarr | 9708 radarr | 9709 prowlarr | 9710 lidarr |
+  # 9711 readarr. qbittorrent-exporter stays on torrent.ts.gn.al:9712
+  # (Mullvad netns) — see the qbittorrent block below.
   - job_name: sonarr
     static_configs:
-      - targets: ["torrent.ts.gn.al:9707"]
+      - targets: ["arr.ts.gn.al:9707"]
         labels:
           stack: cn-bittorrent
           app: sonarr
   - job_name: radarr
     static_configs:
-      - targets: ["torrent.ts.gn.al:9708"]
+      - targets: ["arr.ts.gn.al:9708"]
         labels:
           stack: cn-bittorrent
           app: radarr
   - job_name: prowlarr
     static_configs:
-      - targets: ["torrent.ts.gn.al:9709"]
+      - targets: ["arr.ts.gn.al:9709"]
         labels:
           stack: cn-bittorrent
           app: prowlarr
   - job_name: lidarr
     static_configs:
-      - targets: ["torrent.ts.gn.al:9710"]
+      - targets: ["arr.ts.gn.al:9710"]
         labels:
           stack: cn-bittorrent
           app: lidarr
   - job_name: readarr
     static_configs:
-      - targets: ["torrent.ts.gn.al:9711"]
+      - targets: ["arr.ts.gn.al:9711"]
         labels:
           stack: cn-bittorrent
           app: readarr
