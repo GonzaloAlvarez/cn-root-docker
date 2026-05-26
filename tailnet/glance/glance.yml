@@ -75,6 +75,12 @@ pages:
                   - title: RomM
                     url: https://roms.lab.gn.al
 
+              - title: Apps
+                color: 30 70 50
+                links:
+                  - title: SparkyFitness
+                    url: https://fitness.lab.gn.al
+
               - title: Infra
                 color: 280 70 50
                 links:
@@ -170,6 +176,12 @@ pages:
               # so the default probe works without a check-url override.
               - title: RomM
                 url: https://roms.lab.gn.al
+              # cn-fitness — SparkyFitness frontend nginx returns 200 at /
+              # (serves the React SPA shell unauth). The matching alert is
+              # TailnetIngressProbeFailed on blackbox-tailnet-http; this
+              # monitor is the human-facing version.
+              - title: SparkyFitness
+                url: https://fitness.lab.gn.al
 
           - type: videos
             channels:

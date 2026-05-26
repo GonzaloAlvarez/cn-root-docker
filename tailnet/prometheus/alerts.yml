@@ -141,3 +141,44 @@ groups:
         annotations:
           summary: "{{ $labels.instance }} ingress probe is slow"
           description: "blackbox-k8s-http probe of {{ $labels.instance }} taking >{{ $value | printf \"%.1f\" }}s — likely Longhorn IO contention, MetalLB path issue, or backend overload."
+
+  - name: cn-fitness
+    rules:
+      # blackbox-tailnet-http probes kaiser-hosted tailnet ingresses
+      # (currently just fitness.lab.gn.al; expand the static_configs in
+      # prometheus.yml to cover more). Parallel structure to K8sIngressProbeFailed.
+      - alert: TailnetIngressProbeFailed
+        expr: probe_success{job="blackbox-tailnet-http"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }} ingress probe failing"
+          description: "blackbox-tailnet-http returned non-2xx/3xx/4xx for >5m on {{ $labels.instance }} — kaiser-hosted backend likely down. Check `ssh kaiser.lan 'docker compose -p cn-fitness ps'` and `docker compose -p cn-fitness logs --tail=100`."
+
+      - alert: TailnetIngressSlow
+        expr: probe_duration_seconds{job="blackbox-tailnet-http"} > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} ingress probe is slow"
+          description: "blackbox-tailnet-http probe of {{ $labels.instance }} taking >{{ $value | printf \"%.1f\" }}s — possible Postgres lock contention, backend overload, or tailnet path issue."
+
+      - alert: FitnessPostgresDown
+        expr: up{job="fitness-postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SparkyFitness Postgres scrape failing"
+          description: "postgres-exporter at fitness.ts.gn.al:9187 unreachable for >2m — DB container likely down. Check `ssh kaiser.lan 'docker logs cn-fitness-sparkyfitness-db-1 --tail=50'`."
+
+      - alert: FitnessNodeDown
+        expr: up{job="fitness-node"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SparkyFitness node-exporter scrape failing"
+          description: "fitness.ts.gn.al:9100 unreachable for >5m — likely ts-fitness sidecar netns drift; ts-fitness-watchdog should self-heal within 10s. If persistent, manual `docker compose -p cn-fitness up -d --force-recreate --no-deps node-exporter` from /home/gonzalo/cn-fitness on kaiser."

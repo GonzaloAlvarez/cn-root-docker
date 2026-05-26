@@ -147,6 +147,48 @@ scrape_configs:
           host: roms
           stack: cn-roms
 
+  # cn-fitness (SparkyFitness on kaiser) — host-level metrics from the
+  # node-exporter in ts-fitness netns. Backend (Node.js + better-auth)
+  # has no /metrics endpoint upstream, so app-level signal comes from
+  # blackbox + postgres-exporter (next job).
+  - job_name: fitness-node
+    static_configs:
+      - targets: ["fitness.ts.gn.al:9100"]
+        labels:
+          host: fitness
+          stack: cn-fitness
+          app: node-exporter
+
+  # cn-fitness — Postgres metrics. postgres-exporter shares ts-fitness's
+  # netns and dials the DB via the pinned bridge IP (172.30.1.10). DSN
+  # uses the superuser, not the limited app role, so pg_stat_* views
+  # resolve.
+  - job_name: fitness-postgres
+    static_configs:
+      - targets: ["fitness.ts.gn.al:9187"]
+        labels:
+          stack: cn-fitness
+          app: postgres-exporter
+
+  # Blackbox HTTP probes for kaiser-hosted tailnet ingresses. Separate
+  # job from blackbox-k8s-http because the k8s-services Grafana dashboard
+  # hardcodes job="blackbox-k8s-http" in 5 panel queries — renaming would
+  # break it. Two parallel jobs is the smaller blast radius.
+  - job_name: blackbox-tailnet-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx_3xx_4xx]
+    static_configs:
+      - targets:
+          - https://fitness.lab.gn.al/
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 127.0.0.1:9115
+
   # Blackbox HTTP probes for every k8s tailnet ingress. Probes from the
   # ts-infra netns so traefik-lab → consul → k8s-router → MetalLB pool reflects
   # the same path a real user takes from the tailnet.
