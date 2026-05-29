@@ -276,6 +276,19 @@ services:
       - prometheus
     restart: unless-stopped
 
+  # ts-infra restarts (watchtower image bump, crash, …) leave dependents
+  # attached to the orphaned old netns. Two failure modes the watchdog
+  # handles:
+  #   1) netns drift -- dependent's HostConfig.NetworkMode "container:<id>"
+  #      no longer points at the live ts-infra Id -> force-recreate.
+  #   2) created-but-not-running -- compose-up name-conflict races during
+  #      force-recreate can leave a dependent Status=created (never
+  #      started); restart:unless-stopped does not activate -> compose
+  #      start. Hit in production 2026-05-29 03:00 UTC: consul name
+  #      conflict aborted the up midway, node-exporter got stranded for
+  #      19h, PrometheusTargetDown alert fired.
+  # Both modes are idempotent and silent in steady state. Allowlist
+  # mirrors every `network_mode: service:ts-infra` dependent.
   ts-infra-watchdog:
     image: docker:cli
     volumes:
@@ -285,18 +298,36 @@ services:
     command: >
       sh -c '
         apk add --no-cache docker-cli-compose >/dev/null;
-        echo "[watchdog] ready, polling ts-infra every 10s";
-        LAST="";
+        DEPS="traefik-lab consul coredns alertmanager prometheus grafana loki promtail node-exporter portainer glance blackbox-exporter snmp-exporter";
+        echo "[watchdog] ready, polling dependents every 10s ($$DEPS)";
         while true; do
-          CUR=$$(docker inspect cloudnet-ts-infra-1 --format "{{.State.StartedAt}}" 2>/dev/null || true);
-          if [ -n "$$CUR" ] && [ -n "$$LAST" ] && [ "$$CUR" != "$$LAST" ]; then
-            echo "[watchdog] ts-infra restarted (was $$LAST, now $$CUR), recreating sidecars";
-            docker compose -p cloudnet up -d --force-recreate --no-deps \
-              traefik-lab consul coredns alertmanager prometheus grafana loki promtail node-exporter portainer glance \
-              && echo "[watchdog] sidecars recreated" \
-              || echo "[watchdog] recreate failed";
+          TS_ID=$$(docker inspect cloudnet-ts-infra-1 --format "{{.Id}}" 2>/dev/null || true);
+          if [ -n "$$TS_ID" ]; then
+            NEED_RECREATE="";
+            NEED_START="";
+            for dep in $$DEPS; do
+              INFO=$$(docker inspect cloudnet-$$dep-1 --format "{{.HostConfig.NetworkMode}} {{.State.Status}}" 2>/dev/null || true);
+              [ -n "$$INFO" ] || continue;
+              DEP_NM=$$(echo "$$INFO" | awk "{print \$$1}");
+              DEP_STATUS=$$(echo "$$INFO" | awk "{print \$$2}");
+              DEP_TARGET=$${DEP_NM#container:};
+              if [ "$$DEP_TARGET" != "$$TS_ID" ]; then
+                NEED_RECREATE="$$NEED_RECREATE $$dep";
+              elif [ "$$DEP_STATUS" != "running" ]; then
+                NEED_START="$$NEED_START $$dep";
+              fi;
+            done;
+            if [ -n "$$NEED_RECREATE" ]; then
+              echo "[watchdog] netns drift on:$$NEED_RECREATE -- recreating";
+              docker compose -p cloudnet up -d --force-recreate --no-deps $$NEED_RECREATE \
+                && echo "[watchdog] recreate OK" || echo "[watchdog] recreate FAILED";
+            fi;
+            if [ -n "$$NEED_START" ]; then
+              echo "[watchdog] stopped on:$$NEED_START -- starting";
+              docker compose -p cloudnet start $$NEED_START \
+                && echo "[watchdog] start OK" || echo "[watchdog] start FAILED";
+            fi;
           fi;
-          LAST="$$CUR";
           sleep 10;
         done
       '
