@@ -39,7 +39,7 @@
     {
       "id": 102,
       "type": "stat",
-      "title": "cn-bittorrent jobs up",
+      "title": "cn-bittorrent exporters up",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -59,7 +59,7 @@
           "expr": "count(up{stack=\"cn-bittorrent\"} == 1)",
           "refId": "A",
           "instant": true,
-          "legendFormat": "cn-bittorrent jobs up"
+          "legendFormat": "cn-bittorrent exporters up"
         }
       ],
       "fieldConfig": {
@@ -102,7 +102,7 @@
     {
       "id": 103,
       "type": "stat",
-      "title": "cn-media jobs up",
+      "title": "cn-media exporters up",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -122,7 +122,7 @@
           "expr": "count(up{stack=\"cn-media\"} == 1)",
           "refId": "A",
           "instant": true,
-          "legendFormat": "cn-media jobs up"
+          "legendFormat": "cn-media exporters up"
         }
       ],
       "fieldConfig": {
