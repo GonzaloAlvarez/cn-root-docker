@@ -46,6 +46,8 @@ pages:
                     url: https://filemanager.lab.gn.al
                   - title: FreshRSS
                     url: https://freshrss.lab.gn.al
+                  - title: Home Assistant
+                    url: https://ha.lab.gn.al
                   - title: NetBox
                     url: https://netbox.lab.gn.al
                   - title: raidnas
@@ -184,6 +186,11 @@ pages:
               # infra-exit). Default probe: `/` returns 200 (DSM login HTML).
               - title: raidnas
                 url: https://raidnas.lab.gn.al
+              # cn-ha-sidecar — Home Assistant Supervised on homeiot.lan,
+              # surfaced through ts-ha + traefik-lab. `/` returns 200/302
+              # (HA's frontend redirect), no check-url override needed.
+              - title: Home Assistant
+                url: https://ha.lab.gn.al
 
           - type: videos
             channels:
