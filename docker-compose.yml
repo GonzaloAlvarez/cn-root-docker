@@ -286,6 +286,9 @@ services:
       - GF_AUTH_GENERIC_OAUTH_GROUPS_ATTRIBUTE_PATH=groups
       - GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=contains(groups[*], 'observability') && 'Admin' || 'Viewer'
       - GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT=false
+      # Match existing local users by email when the OIDC identity is new
+      # (default-true on Grafana 11+ but explicit here documents the intent).
+      - GF_AUTH_OAUTH_ALLOW_INSECURE_EMAIL_LOOKUP=true
     volumes:
       - "./tailnet/grafana/provisioning:/etc/grafana/provisioning:ro"
       - "grafana_data:/var/lib/grafana"
