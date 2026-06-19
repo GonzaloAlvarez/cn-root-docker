@@ -42,6 +42,8 @@ pages:
               - title: Apps
                 color: 200 70 50
                 links:
+                  - title: Authentik
+                    url: https://auth.lab.gn.al
                   - title: Filebrowser
                     url: https://filemanager.lab.gn.al
                   - title: FreshRSS
@@ -116,6 +118,8 @@ pages:
             title: Status
             cache: 1m
             sites:
+              - title: Authentik
+                url: https://auth.lab.gn.al
               - title: NetBox
                 url: https://netbox.lab.gn.al
               - title: Vaultwarden
