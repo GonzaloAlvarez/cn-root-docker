@@ -1,14 +1,14 @@
-# Tailnet route for auth.lab.gn.al → Authentik on infra.lan.
+# Tailnet route for auth.lab.gn.al → Authentik on neptune.lan.
 #
-# Authentik runs on the cn-infra Pi (10.1.1.158) inside cn-authentik. Its
+# Authentik runs on the NUC10 (10.1.1.92) inside cn-authentik. Its
 # LAN-side traefik-lan listens on :443 with step-ca certs that include
 # auth.lab.gn.al as a SAN (issued via the cn-authentik dynamic.yml.tmpl).
 # VPS traefik-lab terminates the LE-wildcard cert here and re-encrypts to
 # the upstream — the browser only ever sees the LE cert.
 #
-# The connection from traefik-lab → 10.1.1.158:443 goes through the
+# The connection from traefik-lab → 10.1.1.92:443 goes through the
 # infra-exit subnet route advertising 10.1.0.0/16. The Headscale ACL must
-# allow tag:infra → 10.1.1.158:443 (added to headscale/acl.hujson in this
+# allow tag:infra → 10.1.1.92:443 (added to headscale/acl.hujson in this
 # slice).
 #
 # Priority 100 beats the k8s-cluster wildcard at priority 1.
@@ -37,4 +37,4 @@ http:
         passHostHeader: true  # let Authentik see auth.lab.gn.al
         serversTransport: insecure-stepca
         servers:
-          - url: "https://10.1.1.158:443"
+          - url: "https://10.1.1.92:443"
