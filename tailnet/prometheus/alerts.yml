@@ -182,3 +182,30 @@ groups:
         annotations:
           summary: "SparkyFitness node-exporter scrape failing"
           description: "fitness.ts.gn.al:9100 unreachable for >5m — likely ts-fitness sidecar netns drift; ts-fitness-watchdog should self-heal within 10s. If persistent, manual `docker compose -p cn-fitness up -d --force-recreate --no-deps node-exporter` from /home/gonzalo/cn-fitness on kaiser."
+
+  # ── tailnet TLS pre-expiry ──────────────────────────────────────────────
+  # *.lab.gn.al is a single LE wildcard renewed by traefik-lab via Cloudflare
+  # DNS-01. If renewal silently fails, the existing TailnetIngressProbeFailed /
+  # K8sIngressProbeFailed alerts only fire AFTER the cert is past expiry and
+  # clients have started getting handshake errors. This rule wakes us up 14
+  # days earlier so renewal can be debugged before user-facing breakage.
+  #
+  # All *.lab.gn.al targets share the same wildcard, so probe_ssl_earliest_cert_expiry
+  # is identical across them — Alertmanager will group the N identical alerts
+  # into one notification via the existing `group_by: [alertname]` default.
+  #
+  # NB: deliberately NOT extended to blackbox-https (kaiser side) — those
+  # certs are step-ca leaves with 24 h lifetime + daily renewal, and the
+  # pre-expiry rule would be perma-firing. See the analogous comment in
+  # cn-observability/.../alerts.yml::synthetic.
+  - name: cert-expiry
+    rules:
+      - alert: TailnetCertExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry{job=~"blackbox-tailnet-http|blackbox-k8s-http"} > 0
+              and (probe_ssl_earliest_cert_expiry{job=~"blackbox-tailnet-http|blackbox-k8s-http"} - time()) < (14 * 24 * 3600)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LE cert expiring in <14d: {{ $labels.instance }}"
+          description: "TLS cert for {{ $labels.instance }} (job {{ $labels.job }}) expires in {{ $value | humanizeDuration }}. Check traefik-lab ACME renewal: `ssh hs.gn.al 'docker logs cloudnet-traefik-lab-1 --since=2h | grep -i acme'`."
