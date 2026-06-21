@@ -70,6 +70,15 @@ services:
     command:
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.traefik.address=:8888"
+      # Trust X-Forwarded-* from the tailnet (100.64.0.0/10) so the
+      # Authentik forward-auth middleware's hairpin (traefik-lab → its own
+      # auth-lab router → neptune.lan) preserves the original Host header.
+      # Without this, traefik-lab rewrites X-Forwarded-Host on the hairpin
+      # leg and the Authentik outpost 404s because no provider matches
+      # auth.lab.gn.al as external_host (it matches roms.lab.gn.al).
+      # 127.0.0.0/8 covers the loopback hairpin variant if auth.lab.gn.al
+      # ever resolves to 127.0.0.1 inside ts-infra (MagicDNS quirk).
+      - "--entrypoints.websecure.forwardedHeaders.trustedIPs=100.64.0.0/10,127.0.0.0/8,10.1.0.0/16"
       - "--api=true"
       - "--api.dashboard=true"
       - "--api.insecure=true"
