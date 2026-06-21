@@ -1,0 +1,38 @@
+# cn-root-docker/tailnet/traefik/dynamic/authentik-forward-auth.yml
+#
+# Authentik forward-auth middleware for the tailnet side (traefik-lab).
+#
+# Loaded automatically via traefik-lab's `--providers.file.directory=/etc/traefik/dynamic`.
+# Routers that opt in (via Consul tag `traefik.http.routers.<name>.middlewares=
+# authentik-lab@file`) get the same forward-auth flow as the LAN side:
+#   1) Request → traefik-lab → forwardAuth call to Authentik's embedded outpost
+#      (the outpost lives at /outpost.goauthentik.io/auth/* on the same Authentik
+#      server that serves auth.lab.gn.al).
+#   2) Outpost picks the proxy provider from X-Forwarded-Host (e.g. roms.lab.gn.al
+#      → roms-lab provider). If session present → 200 + Authorization: Basic header.
+#      No session → 302 to auth flow.
+#   3) traefik-lab forwards the Authorization header to the upstream service,
+#      which authenticates the Basic creds natively.
+#
+# `address` deliberately points at the public hostname (auth.lab.gn.al, LE
+# wildcard) so traefik-lab can validate the TLS chain via its built-in
+# system CA bundle without needing to mount step-ca's root. Yes, this means
+# the call hairpins back through traefik-lab's own auth-lab router, which
+# re-encrypts to 10.1.1.92:443 via the cn-infra subnet route. The extra hop
+# is microseconds; the alternative (point directly at 10.1.1.92 with
+# insecureSkipVerify) requires forging a Host header, which forwardAuth
+# doesn't easily support.
+
+http:
+  middlewares:
+    authentik-lab:
+      forwardAuth:
+        address: https://auth.lab.gn.al/outpost.goauthentik.io/auth/traefik
+        trustForwardHeader: true
+        authResponseHeaders:
+          - X-authentik-username
+          - X-authentik-groups
+          - X-authentik-email
+          - X-authentik-name
+          - X-authentik-uid
+          - Authorization
