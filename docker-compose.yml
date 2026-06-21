@@ -123,12 +123,14 @@ services:
   outpost-lab:
     image: ghcr.io/goauthentik/proxy:2024.12
     network_mode: "service:ts-infra"
+    # The proxy binary hardcodes :9000 (HTTP) + :9443 (HTTPS); there are no
+    # env vars or flags to relocate them. Portainer (sibling in this same
+    # netns) used to own :9000 — its `command` was updated to `--bind :9099`
+    # so this outpost can take the conventional 9000.
     environment:
       - AUTHENTIK_HOST=https://auth.lab.gn.al
       - AUTHENTIK_INSECURE=true
       - AUTHENTIK_TOKEN=${OUTPOST_LAB_TOKEN}
-      - AUTHENTIK_LISTEN_HTTP=:9300
-      - AUTHENTIK_LISTEN_HTTPS=:9444
     depends_on:
       - ts-infra
     restart: unless-stopped
@@ -188,7 +190,10 @@ services:
   portainer:
     image: portainer/portainer-ce:latest
     network_mode: "service:ts-infra"
-    command: [ "-H", "unix:///var/run/docker.sock" ]
+    # Bound to :9099 (not :9000) so the Authentik proxy outpost (outpost-lab,
+    # which shares this same netns) can take the conventional 9000 — its
+    # binary doesn't accept any env var or flag to relocate the HTTP listener.
+    command: [ "-H", "unix:///var/run/docker.sock", "--bind", ":9099" ]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - portainer_data:/data

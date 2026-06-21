@@ -76,7 +76,7 @@
       "name": "portainer",
       "id": "portainer-vps",
       "address": "127.0.0.1",
-      "port": 9000,
+      "port": 9099,
       "tags": [
         "traefik.enable=true",
         "traefik.http.routers.portainer.rule=Host(`portainer.${LAB_DOMAIN}`)",
@@ -85,7 +85,7 @@
         "traefik.http.routers.portainer.tls.certresolver=dns"
       ],
       "check": {
-        "tcp": "127.0.0.1:9000",
+        "tcp": "127.0.0.1:9099",
         "interval": "10s",
         "deregister_critical_service_after": "2m"
       }
