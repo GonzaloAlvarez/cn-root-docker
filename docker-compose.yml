@@ -105,6 +105,34 @@ services:
       - consul
     restart: unless-stopped
 
+  # Authentik proxy outpost — DEDICATED to the tailnet ingress for RomM
+  # (and any future *.lab.gn.al service that wants forward-auth SSO).
+  # Lives in ts-infra's netns so traefik-lab can hit its auth endpoint on
+  # localhost (no inter-container TCP needed). Its `config.authentik_host_browser`
+  # is set to https://auth.lab.gn.al by setup-romm-proxy-sso.sh, so 302s
+  # from this outpost land on the tailnet-resolvable Authentik URL — the
+  # embedded outpost on neptune (configured with auth.neptune.lan) keeps
+  # serving the LAN ingress for roms.kaiser.lan.
+  #
+  # AUTHENTIK_TOKEN comes from the outpost-lab token in Authentik; obtain
+  # via `setup-romm-proxy-sso.sh` (printed at the end). AUTHENTIK_INSECURE
+  # is `true` because the call to auth.lab.gn.al hairpins through this
+  # same traefik-lab to neptune (`tls: insecureSkipVerify: true` on the
+  # `auth-lab` service in dynamic/auth.yml), and the outpost would
+  # otherwise reject the self-signed step-ca leaf at the neptune hop.
+  outpost-lab:
+    image: ghcr.io/goauthentik/proxy:2024.12
+    network_mode: "service:ts-infra"
+    environment:
+      - AUTHENTIK_HOST=https://auth.lab.gn.al
+      - AUTHENTIK_INSECURE=true
+      - AUTHENTIK_TOKEN=${OUTPOST_LAB_TOKEN}
+      - AUTHENTIK_LISTEN_HTTP=:9300
+      - AUTHENTIK_LISTEN_HTTPS=:9444
+    depends_on:
+      - ts-infra
+    restart: unless-stopped
+
   coredns:
     image: coredns/coredns:1.11.1
     network_mode: "service:ts-infra"
@@ -328,7 +356,7 @@ services:
     command: >
       sh -c '
         apk add --no-cache docker-cli-compose >/dev/null;
-        DEPS="traefik-lab consul coredns alertmanager prometheus grafana loki promtail node-exporter portainer glance blackbox-exporter snmp-exporter";
+        DEPS="traefik-lab consul coredns alertmanager prometheus grafana loki promtail node-exporter portainer glance blackbox-exporter snmp-exporter outpost-lab";
         ACTION_THRESHOLD=3;
         ACTION_COUNT=0;
         echo "[watchdog] ready, polling dependents every 10s ($$DEPS), drift threshold $$ACTION_THRESHOLD polls";
