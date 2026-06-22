@@ -45,9 +45,17 @@
     { "action": "accept", "src": ["tag:infra"], "dst": ["10.120.26.0/24:161,5000,5005"] },
 
     // cn-authentik on neptune.lan (10.1.1.92) — same subnet-routed pattern
-    // as raidnas. VPS traefik-lab (tag:infra) needs :443 to terminate the
-    // tailnet auth.lab.gn.al → re-encrypt → step-ca-fronted traefik-lan.
-    { "action": "accept", "src": ["tag:infra"], "dst": ["10.1.1.92:443"] },
+    // as raidnas. VPS traefik-lab (tag:infra) needs:
+    //   :443  — terminate the tailnet auth.lab.gn.al → re-encrypt → step-ca-
+    //           fronted traefik-lan path
+    //   :9300 — reach outpost-cluster (Authentik proxy outpost serving
+    //           longhorn-lab and future cluster-side tailnet apps; tailnet
+    //           browsers reach it via outpost-cluster.lab.gn.al, routed in
+    //           tailnet/traefik/dynamic/outpost-cluster.yml). The container
+    //           inside cn-authentik publishes 10.1.1.92:9300 → :9000; UFW
+    //           on neptune additionally allows 9300/tcp from 10.0.0.0/8 +
+    //           100.64.0.0/10 so this ACL passing is enough.
+    { "action": "accept", "src": ["tag:infra"], "dst": ["10.1.1.92:443,9300"] },
 
     // cn-bittorrent on kaiser.lan — tag:vpn-client is egress-quarantined:
     // it MUST route public-internet egress via an exit node (infra-mullvad),
