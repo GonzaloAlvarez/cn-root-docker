@@ -1,0 +1,50 @@
+# Tailnet route for outpost-cluster.lab.gn.al → outpost-cluster on neptune.
+#
+# outpost-cluster is the third Authentik proxy outpost in the homelab,
+# living in cn-authentik on neptune.lan and dedicated to cluster-side
+# tailnet apps (longhorn-lab today, future k3s *.lab.gn.al apps later).
+# k3s nginx-ingress hits it server-side at http://10.1.1.92:9300; tailnet
+# browsers hit it via this route at https://outpost-cluster.lab.gn.al
+# (so the outpost-issued 302 to /application/o/authorize/ — which uses
+# authentik_host_browser=auth.lab.gn.al — lands on a host the tailnet
+# browser can resolve).
+#
+# Same shape as auth.yml: traefik-lab terminates the LE wildcard and
+# re-encrypts to neptune via the infra-exit subnet route advertising
+# 10.0.0.0/8 + 10.1.0.0/16. insecureSkipVerify on the re-encrypt because
+# outpost-cluster on neptune:9300 is plain HTTP (no TLS layer of its own
+# — the proxy binary listens HTTP-only on the configured port; only the
+# LE cert at the VPS hop is visible to the browser).
+#
+# Priority 100 to match auth-lab (the other neptune-bound route). The
+# k8s-cluster.yml wildcard route is priority 1 and won't preempt.
+http:
+  serversTransports:
+    outpost-cluster-direct:
+      # outpost-cluster speaks plain HTTP on :9300; no TLS verify needed
+      # on this hop, but if traefik ever auto-upgrades, this keeps the
+      # behaviour explicit.
+      insecureSkipVerify: true
+
+  routers:
+    outpost-cluster-lab:
+      rule: "Host(`outpost-cluster.lab.gn.al`)"
+      entryPoints: [websecure]
+      service: outpost-cluster-lab
+      priority: 100
+      tls:
+        certResolver: dns
+        domains:
+          - main: "lab.gn.al"
+            sans: ["*.lab.gn.al"]
+
+  services:
+    outpost-cluster-lab:
+      loadBalancer:
+        # Pass the browser's Host header through so the outpost's
+        # X-Forwarded-Host matching works correctly (the proxy provider
+        # whose external_host equals https://longhorn.lab.gn.al matches
+        # the original Host carried by nginx-ingress's subrequest).
+        passHostHeader: true
+        servers:
+          - url: "http://10.1.1.92:9300"
