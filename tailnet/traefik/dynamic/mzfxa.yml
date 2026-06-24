@@ -1,0 +1,83 @@
+# Tailnet routes for self-hosted Mozilla Accounts (FxA) + Sync.
+# Backends:
+#   - cn-mzfxa on neptune.lan — auth/content/profile services behind
+#     traefik-lan on :443. Re-encrypt with insecureSkipVerify because
+#     the cert is step-ca-signed (not LE).
+#   - cn-mzsync on neptune.lan — syncserver bound to 10.1.1.92:8001
+#     (plain HTTP; TLS terminated at VPS).
+#
+# All routes priority 100 (same as outpost-cluster, auth, k8s-cluster).
+
+http:
+  serversTransports:
+    neptune-tls:
+      insecureSkipVerify: true
+
+  routers:
+    accounts-fxa-lab:
+      rule: "Host(`accounts.fxa.lab.gn.al`)"
+      entryPoints: [websecure]
+      service: neptune-443
+      priority: 100
+      tls:
+        certResolver: dns
+        domains:
+          - main: "lab.gn.al"
+            sans: ["*.lab.gn.al"]
+
+    api-fxa-lab:
+      rule: "Host(`api.fxa.lab.gn.al`)"
+      entryPoints: [websecure]
+      service: neptune-443
+      priority: 100
+      tls:
+        certResolver: dns
+        domains:
+          - main: "lab.gn.al"
+            sans: ["*.lab.gn.al"]
+
+    oauth-fxa-lab:
+      rule: "Host(`oauth.fxa.lab.gn.al`)"
+      entryPoints: [websecure]
+      service: neptune-443
+      priority: 100
+      tls:
+        certResolver: dns
+        domains:
+          - main: "lab.gn.al"
+            sans: ["*.lab.gn.al"]
+
+    profile-fxa-lab:
+      rule: "Host(`profile.fxa.lab.gn.al`)"
+      entryPoints: [websecure]
+      service: neptune-443
+      priority: 100
+      tls:
+        certResolver: dns
+        domains:
+          - main: "lab.gn.al"
+            sans: ["*.lab.gn.al"]
+
+    sync-lab:
+      rule: "Host(`sync.lab.gn.al`)"
+      entryPoints: [websecure]
+      service: neptune-sync
+      priority: 100
+      tls:
+        certResolver: dns
+        domains:
+          - main: "lab.gn.al"
+            sans: ["*.lab.gn.al"]
+
+  services:
+    neptune-443:
+      loadBalancer:
+        passHostHeader: true
+        serversTransport: neptune-tls
+        servers:
+          - url: "https://10.1.1.92:443"
+    neptune-sync:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://10.1.1.92:8001"

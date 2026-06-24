@@ -55,7 +55,10 @@
     //           inside cn-authentik publishes 10.1.1.92:9300 → :9000; UFW
     //           on neptune additionally allows 9300/tcp from 10.0.0.0/8 +
     //           100.64.0.0/10 so this ACL passing is enough.
-    { "action": "accept", "src": ["tag:infra"], "dst": ["10.1.1.92:443,9300"] },
+    //   :8001 — reach cn-mzsync's syncserver (Firefox Sync data plane;
+    //           tailnet clients hit sync.lab.gn.al → 10.1.1.92:8001;
+    //           routed in tailnet/traefik/dynamic/mzfxa.yml).
+    { "action": "accept", "src": ["tag:infra"], "dst": ["10.1.1.92:443,8001,9300"] },
 
     // cn-bittorrent on kaiser.lan — tag:vpn-client is egress-quarantined:
     // it MUST route public-internet egress via an exit node (infra-mullvad),

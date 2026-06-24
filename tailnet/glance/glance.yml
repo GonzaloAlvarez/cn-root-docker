@@ -46,6 +46,8 @@ pages:
                     url: https://auth.lab.gn.al
                   - title: Filebrowser
                     url: https://filemanager.lab.gn.al
+                  - title: Firefox Sync
+                    url: https://accounts.fxa.lab.gn.al
                   - title: FreshRSS
                     url: https://freshrss.lab.gn.al
                   - title: Home Assistant
@@ -126,6 +128,9 @@ pages:
                 url: https://passwords.lab.gn.al
               - title: Filebrowser
                 url: https://filemanager.lab.gn.al
+              - title: Firefox Sync
+                url: https://accounts.fxa.lab.gn.al
+                check-url: https://accounts.fxa.lab.gn.al/.well-known/fxa-client-configuration
               - title: FreshRSS
                 url: https://freshrss.lab.gn.al
               - title: Headlamp
