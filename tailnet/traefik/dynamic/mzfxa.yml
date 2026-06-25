@@ -22,8 +22,11 @@ http:
       tls:
         certResolver: dns
         domains:
+          # *.lab.gn.al covers sync.lab.gn.al (one level).
+          # *.fxa.lab.gn.al covers accounts/api/oauth/profile.fxa.lab.gn.al
+          # (LE wildcards match only ONE label, so we need both).
           - main: "lab.gn.al"
-            sans: ["*.lab.gn.al"]
+            sans: ["*.lab.gn.al", "*.fxa.lab.gn.al"]
 
     api-fxa-lab:
       rule: "Host(`api.fxa.lab.gn.al`)"
@@ -33,8 +36,11 @@ http:
       tls:
         certResolver: dns
         domains:
+          # *.lab.gn.al covers sync.lab.gn.al (one level).
+          # *.fxa.lab.gn.al covers accounts/api/oauth/profile.fxa.lab.gn.al
+          # (LE wildcards match only ONE label, so we need both).
           - main: "lab.gn.al"
-            sans: ["*.lab.gn.al"]
+            sans: ["*.lab.gn.al", "*.fxa.lab.gn.al"]
 
     oauth-fxa-lab:
       rule: "Host(`oauth.fxa.lab.gn.al`)"
@@ -44,8 +50,11 @@ http:
       tls:
         certResolver: dns
         domains:
+          # *.lab.gn.al covers sync.lab.gn.al (one level).
+          # *.fxa.lab.gn.al covers accounts/api/oauth/profile.fxa.lab.gn.al
+          # (LE wildcards match only ONE label, so we need both).
           - main: "lab.gn.al"
-            sans: ["*.lab.gn.al"]
+            sans: ["*.lab.gn.al", "*.fxa.lab.gn.al"]
 
     profile-fxa-lab:
       rule: "Host(`profile.fxa.lab.gn.al`)"
@@ -55,8 +64,11 @@ http:
       tls:
         certResolver: dns
         domains:
+          # *.lab.gn.al covers sync.lab.gn.al (one level).
+          # *.fxa.lab.gn.al covers accounts/api/oauth/profile.fxa.lab.gn.al
+          # (LE wildcards match only ONE label, so we need both).
           - main: "lab.gn.al"
-            sans: ["*.lab.gn.al"]
+            sans: ["*.lab.gn.al", "*.fxa.lab.gn.al"]
 
     sync-lab:
       rule: "Host(`sync.lab.gn.al`)"
@@ -66,8 +78,11 @@ http:
       tls:
         certResolver: dns
         domains:
+          # *.lab.gn.al covers sync.lab.gn.al (one level).
+          # *.fxa.lab.gn.al covers accounts/api/oauth/profile.fxa.lab.gn.al
+          # (LE wildcards match only ONE label, so we need both).
           - main: "lab.gn.al"
-            sans: ["*.lab.gn.al"]
+            sans: ["*.lab.gn.al", "*.fxa.lab.gn.al"]
 
   services:
     neptune-443:
