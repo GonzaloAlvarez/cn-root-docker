@@ -85,6 +85,16 @@ pages:
                   - title: RomM
                     url: https://roms.lab.gn.al
 
+              - title: Books
+                color: 230 70 50
+                links:
+                  - title: Audiobookshelf
+                    url: https://audiobookshelf.lab.gn.al
+                  - title: Calibre-Web
+                    url: https://calibre.lab.gn.al
+                  - title: Shelfmark
+                    url: https://shelfmark.lab.gn.al
+
               - title: Infra
                 color: 280 70 50
                 links:
@@ -185,6 +195,14 @@ pages:
               # so the default probe works without a check-url override.
               - title: RomM
                 url: https://roms.lab.gn.al
+              # cn-books — Calibre-Web / Shelfmark / Audiobookshelf all return
+              # 200 at / (SPA shell / login), so the default probe works.
+              - title: Audiobookshelf
+                url: https://audiobookshelf.lab.gn.al
+              - title: Calibre-Web
+                url: https://calibre.lab.gn.al
+              - title: Shelfmark
+                url: https://shelfmark.lab.gn.al
               # cn-fitness — SparkyFitness frontend nginx returns 200 at /
               # (serves the React SPA shell unauth). The matching alert is
               # TailnetIngressProbeFailed on blackbox-tailnet-http; this
