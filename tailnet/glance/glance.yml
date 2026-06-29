@@ -54,6 +54,8 @@ pages:
                     url: https://ha.lab.gn.al
                   - title: NetBox
                     url: https://netbox.lab.gn.al
+                  - title: Outline
+                    url: https://outline.lab.gn.al
                   - title: raidnas
                     url: https://raidnas.lab.gn.al
                   - title: SparkyFitness
@@ -134,6 +136,11 @@ pages:
                 url: https://auth.lab.gn.al
               - title: NetBox
                 url: https://netbox.lab.gn.al
+              - title: Outline
+                url: https://outline.lab.gn.al
+                # Outline's `/` 302s to the OIDC login; probe the unauth health
+                # endpoint so the monitor gets a clean 200.
+                check-url: https://outline.lab.gn.al/_health
               - title: Vaultwarden
                 url: https://passwords.lab.gn.al
               - title: Filebrowser

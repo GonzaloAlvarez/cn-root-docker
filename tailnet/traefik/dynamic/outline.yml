@@ -1,0 +1,31 @@
+# Tailnet route for Outline (cn-outline on neptune.lan).
+# Backend: cn-outline behind neptune's traefik-lan on :443 (step-ca leaf).
+# Re-encrypt with insecureSkipVerify (same pattern as auth.yml / mzfxa.yml):
+# the browser only ever sees the LE cert at this VPS hop.
+#
+# outline.lab.gn.al is one label under *.lab.gn.al, so the existing LE wildcard
+# covers it — no new cert/SAN needed.
+http:
+  serversTransports:
+    outline-neptune-tls:
+      insecureSkipVerify: true
+
+  routers:
+    outline-lab:
+      rule: "Host(`outline.lab.gn.al`)"
+      entryPoints: [websecure]
+      service: outline-neptune-443
+      priority: 100
+      tls:
+        certResolver: dns
+        domains:
+          - main: "lab.gn.al"
+            sans: ["*.lab.gn.al"]
+
+  services:
+    outline-neptune-443:
+      loadBalancer:
+        passHostHeader: true
+        serversTransport: outline-neptune-tls
+        servers:
+          - url: "https://10.1.1.92:443"
