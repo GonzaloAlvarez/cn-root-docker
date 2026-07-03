@@ -1,0 +1,14 @@
+# amun-docker resiliency manifest for the cloudnet (cn-root-docker) stack.
+#
+# cn-root-docker is checked out at /opt/cloudnet on the VPS (project name
+# `cloudnet`), which is OUTSIDE amun-docker's ~/~/dev cn-* discovery. To bring
+# it into the convention we place a stub `~/cn-root-docker/` dir on the VPS
+# holding a COPY of this manifest; discovery finds that stub, and `working_dir`
+# points the boot unit + reconcile cron at the real compose location.
+project: cloudnet
+working_dir: /opt/cloudnet
+boot:
+  enabled: true
+reconcile:
+  enabled: true
+  schedule: "*/5 * * * *"
