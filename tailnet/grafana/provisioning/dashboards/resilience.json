@@ -1,0 +1,121 @@
+{
+  "uid": "resilience",
+  "title": "Resilience",
+  "tags": ["resilience", "homelab"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "links": [
+    {
+      "asDropdown": false, "icon": "external link", "includeVars": false, "keepTime": true,
+      "tags": ["homelab"], "targetBlank": false, "title": "Dashboards", "tooltip": "", "type": "dashboards", "url": ""
+    }
+  ],
+  "panels": [
+    {
+      "id": 1, "type": "row", "title": "Overview — amun-docker stack resiliency",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }, "collapsed": false, "panels": []
+    },
+    {
+      "id": 2, "type": "stat", "title": "Boot units active",
+      "description": "docker-compose@<stack> systemd units reporting active. Fed by resilience_boot_unit_active (reconcile-stack.sh).",
+      "datasource": { "type": "prometheus", "uid": "kaiser-prometheus" },
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 5 },
+      "targets": [
+        { "expr": "sum(resilience_boot_unit_active)", "refId": "A", "legendFormat": "active" },
+        { "expr": "count(resilience_boot_unit_active)", "refId": "B", "legendFormat": "total" }
+      ],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" }
+    },
+    {
+      "id": 3, "type": "stat", "title": "Reconcilers healthy",
+      "description": "Stacks whose last reconcile run reported success.",
+      "datasource": { "type": "prometheus", "uid": "kaiser-prometheus" },
+      "gridPos": { "x": 6, "y": 1, "w": 6, "h": 5 },
+      "targets": [
+        { "expr": "sum(resilience_reconcile_success)", "refId": "A", "legendFormat": "ok" },
+        { "expr": "count(resilience_reconcile_success)", "refId": "B", "legendFormat": "total" }
+      ],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name" }
+    },
+    {
+      "id": 4, "type": "stat", "title": "Stale reconcilers (>15m)",
+      "description": "Stacks whose reconcile cron has not run in 15 minutes — cron or host problem.",
+      "datasource": { "type": "prometheus", "uid": "kaiser-prometheus" },
+      "gridPos": { "x": 12, "y": 1, "w": 6, "h": 5 },
+      "targets": [
+        { "expr": "count(time() - resilience_reconcile_last_run_seconds > 900) or vector(0)", "refId": "A", "legendFormat": "stale" }
+      ],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }, "color": { "mode": "thresholds" } }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" }
+    },
+    {
+      "id": 5, "type": "stat", "title": "Repairs (24h)",
+      "description": "Container repairs performed by reconcile-stack.sh in the last 24h (exited started + drift/unhealthy recreated).",
+      "datasource": { "type": "prometheus", "uid": "kaiser-prometheus" },
+      "gridPos": { "x": 18, "y": 1, "w": 6, "h": 5 },
+      "targets": [
+        { "expr": "sum(increase(resilience_reconcile_repairs_total[24h]))", "refId": "A", "legendFormat": "repairs" }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }] } }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" }
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Repairs by stack",
+      "datasource": { "type": "prometheus", "uid": "kaiser-prometheus" },
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "sum by (stack) (increase(resilience_reconcile_repairs_total[1h]))", "refId": "A", "legendFormat": "{{stack}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "lineWidth": 1, "fillOpacity": 40, "showPoints": "never" } }, "overrides": [] },
+      "options": { "tooltip": { "mode": "multi", "sort": "desc" }, "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true } }
+    },
+    {
+      "id": 7, "type": "table", "title": "Per-stack reconcile last-run age",
+      "description": "Seconds since each stack's reconcile last ran. Green < 10m, red > 15m (cron interval is 5m).",
+      "datasource": { "type": "prometheus", "uid": "kaiser-prometheus" },
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "time() - resilience_reconcile_last_run_seconds", "refId": "A", "format": "table", "instant": true }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true, "job": true, "instance": true }, "renameByName": { "Value": "age (s)", "stack": "Stack", "host": "Host" } } }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "age (s)" }, "properties": [
+            { "id": "unit", "value": "s" },
+            { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+            { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 600 }, { "color": "red", "value": 900 }] } }
+          ] }
+        ]
+      },
+      "options": { "showHeader": true, "sortBy": [{ "displayName": "age (s)", "desc": true }] }
+    },
+    {
+      "id": 10, "type": "row", "title": "Logs (systemd boot units + reconcile activity)",
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 }, "collapsed": false, "panels": []
+    },
+    {
+      "id": 11, "type": "logs", "title": "Boot units (docker-compose@*) — all hosts",
+      "datasource": { "type": "loki", "uid": "kaiser-loki" },
+      "gridPos": { "x": 0, "y": 15, "w": 24, "h": 10 },
+      "targets": [ { "expr": "{unit=~\"docker-compose@.+\\\\.service\"}", "refId": "A" } ],
+      "options": { "showTime": true, "showLabels": true, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending" }
+    },
+    {
+      "id": 12, "type": "logs", "title": "Reconcile activity (reconcile-stack.sh) — all hosts",
+      "datasource": { "type": "loki", "uid": "kaiser-loki" },
+      "gridPos": { "x": 0, "y": 25, "w": 24, "h": 10 },
+      "targets": [ { "expr": "{job=~\".*journal\"} |~ \"reconcile-stack\"", "refId": "A" } ],
+      "options": { "showTime": true, "showLabels": true, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": false, "enableLogDetails": true, "dedupStrategy": "none", "sortOrder": "Descending" }
+    }
+  ]
+}
