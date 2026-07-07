@@ -145,7 +145,8 @@ groups:
   - name: cn-fitness
     rules:
       # blackbox-tailnet-http probes kaiser-hosted tailnet ingresses
-      # (currently just fitness.lab.gn.al; expand the static_configs in
+      # (covers fitness.lab.gn.al on kaiser + the *.fxa.lab.gn.al and
+      # sync.lab.gn.al backends on neptune; expand the static_configs in
       # prometheus.yml to cover more). Parallel structure to K8sIngressProbeFailed.
       - alert: TailnetIngressProbeFailed
         expr: probe_success{job="blackbox-tailnet-http"} == 0
@@ -154,7 +155,7 @@ groups:
           severity: critical
         annotations:
           summary: "{{ $labels.instance }} ingress probe failing"
-          description: "blackbox-tailnet-http returned non-2xx/3xx/4xx for >5m on {{ $labels.instance }} — kaiser-hosted backend likely down. Check `ssh kaiser.lan 'docker compose -p cn-fitness ps'` and `docker compose -p cn-fitness logs --tail=100`."
+          description: "blackbox-tailnet-http got a status outside valid_status_codes (or no response) for >5m on {{ $labels.instance }} — the VPS traefik-lab → backend path is failing or returning an unexpected code. The backend depends on the host in the URL: fitness.lab.gn.al → kaiser cn-fitness; *.fxa.lab.gn.al → neptune cn-mzfxa; sync.lab.gn.al → neptune cn-mzsync. SSH the owning host and check that stack's `docker compose ps` + logs, plus the VPS traefik-lab route."
 
       - alert: TailnetIngressSlow
         expr: probe_duration_seconds{job="blackbox-tailnet-http"} > 5

@@ -185,7 +185,9 @@ scrape_configs:
           - https://api.fxa.lab.gn.al/__heartbeat__
           - https://oauth.fxa.lab.gn.al/__heartbeat__
           - https://profile.fxa.lab.gn.al/__heartbeat__
-          - https://sync.lab.gn.al/__heartbeat__
+          # legacy mozilla/syncserver has no /__heartbeat__ (fxa-mono-only endpoint);
+          # the tokenserver returns 401 unauthenticated (in valid_status_codes) — proves it's serving.
+          - https://sync.lab.gn.al/token/1.0/sync/1.5
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
