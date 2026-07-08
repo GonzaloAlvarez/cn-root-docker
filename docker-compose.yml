@@ -360,7 +360,7 @@ services:
     working_dir: ${PWD}
     command: >
       sh -c '
-        apk add --no-cache docker-cli-compose >/dev/null;
+        until apk add --no-cache docker-cli-compose >/dev/null 2>&1; do echo "[watchdog] waiting for network to install docker-cli-compose"; sleep 5; done;
         DEPS="traefik-lab consul coredns alertmanager prometheus grafana loki promtail node-exporter portainer glance blackbox-exporter snmp-exporter outpost-lab";
         ACTION_THRESHOLD=3;
         ACTION_COUNT=0;
