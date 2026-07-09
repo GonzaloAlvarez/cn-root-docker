@@ -82,6 +82,8 @@ pages:
               - title: Media
                 color: 160 70 50
                 links:
+                  - title: Immich
+                    url: https://photos.lab.gn.al
                   - title: Jellyfin
                     url: https://jellyfin.lab.gn.al
                   - title: RomM
@@ -193,6 +195,11 @@ pages:
               - title: Readarr
                 url: https://readarr.lab.gn.al
                 check-url: https://readarr.lab.gn.al/ping
+              # cn-immich — `/` 302s to the OAuth login; probe the unauth ping
+              # endpoint so the monitor gets a clean 200.
+              - title: Immich
+                url: https://photos.lab.gn.al
+                check-url: https://photos.lab.gn.al/api/server/ping
               # cn-media — jellyfin's `/` returns 302 → /web/ (200 unauth).
               # Glance follows redirects by default, so no check-url override
               # needed. Cheap unauth alternative: /System/Info/Public → 200 JSON.

@@ -1,0 +1,31 @@
+# Tailnet route for Immich (cn-immich on neptune.lan).
+# Backend: cn-immich behind neptune's traefik-lan on :443 (step-ca leaf).
+# Re-encrypt with insecureSkipVerify (same pattern as outline.yml / auth.yml):
+# the browser (and the Immich mobile app) only ever see the LE cert at this VPS hop.
+#
+# photos.lab.gn.al is one label under *.lab.gn.al, so the existing LE wildcard
+# covers it — no new cert/SAN needed.
+http:
+  serversTransports:
+    immich-neptune-tls:
+      insecureSkipVerify: true
+
+  routers:
+    immich-lab:
+      rule: "Host(`photos.lab.gn.al`)"
+      entryPoints: [websecure]
+      service: immich-neptune-443
+      priority: 100
+      tls:
+        certResolver: dns
+        domains:
+          - main: "lab.gn.al"
+            sans: ["*.lab.gn.al"]
+
+  services:
+    immich-neptune-443:
+      loadBalancer:
+        passHostHeader: true
+        serversTransport: immich-neptune-tls
+        servers:
+          - url: "https://10.1.1.92:443"
