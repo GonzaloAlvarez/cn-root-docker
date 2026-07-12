@@ -52,6 +52,8 @@ pages:
                     url: https://freshrss.lab.gn.al
                   - title: Home Assistant
                     url: https://ha.lab.gn.al
+                  - title: LibreChat
+                    url: https://chat.lab.gn.al
                   - title: NetBox
                     url: https://netbox.lab.gn.al
                   - title: Outline
@@ -223,6 +225,10 @@ pages:
               # monitor is the human-facing version.
               - title: SparkyFitness
                 url: https://fitness.lab.gn.al
+              # cn-librechat — LibreChat serves the login SPA at / (200 unauth)
+              # when OPENID_AUTO_REDIRECT is false, so the default probe works.
+              - title: LibreChat
+                url: https://chat.lab.gn.al
               # raidnas — DSM 7.2.1 on 10.120.26.20:5000 (subnet-routed via
               # infra-exit). Default probe: `/` returns 200 (DSM login HTML).
               - title: raidnas

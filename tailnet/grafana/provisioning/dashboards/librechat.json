@@ -1,0 +1,492 @@
+{
+  "uid": "librechat",
+  "title": "LibreChat",
+  "tags": [
+    "librechat",
+    "homelab",
+    "cn-librechat"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "At a glance",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Probe success",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "probe_success{instance=\"https://chat.lab.gn.al/\"}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Probe latency",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 6, "y": 1, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "probe_duration_seconds{instance=\"https://chat.lab.gn.al/\"}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "TLS days remaining",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 1, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "(probe_ssl_earliest_cert_expiry{instance=\"https://chat.lab.gn.al/\"} - time()) / 86400"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "d",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 7 },
+              { "color": "green", "value": 30 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "MongoDB up",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 18, "y": 1, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "mongodb_up{instance=\"chat.ts.gn.al:9216\"}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Host (kaiser via ts-librechat netns)",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "gauge",
+      "title": "CPU usage",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 6, "w": 6, "h": 7 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "(1 - avg by (instance)(rate(node_cpu_seconds_total{instance=\"chat.ts.gn.al:9100\",mode=\"idle\"}[5m]))) * 100"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 12,
+      "type": "gauge",
+      "title": "Memory usage",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 6, "y": 6, "w": 6, "h": 7 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "(1 - node_memory_MemAvailable_bytes{instance=\"chat.ts.gn.al:9100\"} / node_memory_MemTotal_bytes{instance=\"chat.ts.gn.al:9100\"}) * 100"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 13,
+      "type": "gauge",
+      "title": "Disk usage (/)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 6, "w": 6, "h": 7 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "(1 - node_filesystem_avail_bytes{instance=\"chat.ts.gn.al:9100\",mountpoint=\"/\"} / node_filesystem_size_bytes{instance=\"chat.ts.gn.al:9100\",mountpoint=\"/\"}) * 100"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Load average",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 18, "y": 6, "w": 6, "h": 7 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "node_load1{instance=\"chat.ts.gn.al:9100\"}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Network throughput",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "rate(node_network_receive_bytes_total{instance=\"chat.ts.gn.al:9100\",device!~\"lo|docker.*|veth.*|br-.*|tailscale.*\"}[5m]) * 8",
+          "legendFormat": "rx {{device}}"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "B",
+          "expr": "rate(node_network_transmit_bytes_total{instance=\"chat.ts.gn.al:9100\",device!~\"lo|docker.*|veth.*|br-.*|tailscale.*\"}[5m]) * 8",
+          "legendFormat": "tx {{device}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Disk I/O",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 7 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "rate(node_disk_read_bytes_total{instance=\"chat.ts.gn.al:9100\",device!~\"loop.*|dm-.*\"}[5m])",
+          "legendFormat": "read {{device}}"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "B",
+          "expr": "rate(node_disk_written_bytes_total{instance=\"chat.ts.gn.al:9100\",device!~\"loop.*|dm-.*\"}[5m])",
+          "legendFormat": "write {{device}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "MongoDB (cn-librechat-mongodb-1)",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Connections (current)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 21, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "mongodb_connections{instance=\"chat.ts.gn.al:9216\",state=\"current\"}",
+          "legendFormat": "current"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "B",
+          "expr": "mongodb_connections{instance=\"chat.ts.gn.al:9216\",state=\"available\"}",
+          "legendFormat": "available"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Operations/sec",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 12, "y": 21, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "rate(mongodb_op_counters_total{instance=\"chat.ts.gn.al:9216\"}[5m])",
+          "legendFormat": "{{type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Resident memory",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "x": 0, "y": 29, "w": 24, "h": 7 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "A",
+          "expr": "mongodb_memory{instance=\"chat.ts.gn.al:9216\",type=\"resident\"} * 1024 * 1024",
+          "legendFormat": "resident"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "refId": "B",
+          "expr": "mongodb_memory{instance=\"chat.ts.gn.al:9216\",type=\"virtual\"} * 1024 * 1024",
+          "legendFormat": "virtual"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 10 }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "id": 30,
+      "type": "row",
+      "title": "Logs (last 1h)",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 36, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 31,
+      "type": "logs",
+      "title": "All cn-librechat logs",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 0, "y": 37, "w": 24, "h": 10 },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "refId": "A",
+          "expr": "{stack=\"cn-librechat\"}"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      }
+    },
+    {
+      "id": 32,
+      "type": "logs",
+      "title": "Errors / warnings only",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "x": 0, "y": 47, "w": 24, "h": 8 },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "refId": "A",
+          "expr": "{stack=\"cn-librechat\"} |~ \"(?i)(error|panic|fatal|warn)\""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      }
+    }
+  ]
+}

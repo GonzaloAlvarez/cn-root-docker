@@ -170,6 +170,26 @@ scrape_configs:
           stack: cn-fitness
           app: postgres-exporter
 
+  # cn-librechat (LibreChat on kaiser) — host-level metrics from the
+  # node-exporter in ts-librechat netns. The api has no upstream /metrics
+  # endpoint, so app-level signal comes from blackbox + mongodb-exporter.
+  - job_name: librechat-node
+    static_configs:
+      - targets: ["chat.ts.gn.al:9100"]
+        labels:
+          host: librechat
+          stack: cn-librechat
+          app: node-exporter
+
+  # cn-librechat — MongoDB metrics. mongodb-exporter shares ts-librechat's
+  # netns and dials Mongo via the pinned bridge IP (172.30.2.10:27017).
+  - job_name: librechat-mongodb
+    static_configs:
+      - targets: ["chat.ts.gn.al:9216"]
+        labels:
+          stack: cn-librechat
+          app: mongodb-exporter
+
   # Blackbox HTTP probes for kaiser-hosted tailnet ingresses. Separate
   # job from blackbox-k8s-http because the k8s-services Grafana dashboard
   # hardcodes job="blackbox-k8s-http" in 5 panel queries — renaming would
@@ -181,6 +201,7 @@ scrape_configs:
     static_configs:
       - targets:
           - https://fitness.lab.gn.al/
+          - https://chat.lab.gn.al/
           - https://accounts.fxa.lab.gn.al/.well-known/fxa-client-configuration
           - https://api.fxa.lab.gn.al/__heartbeat__
           - https://oauth.fxa.lab.gn.al/__heartbeat__
