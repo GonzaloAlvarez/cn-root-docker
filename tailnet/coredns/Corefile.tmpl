@@ -5,6 +5,22 @@
   errors
 }
 
+# Cloud devboxes: <name>.devbox.lab.<domain> -> the box's tailnet IP.
+# Stateless: rewrite to the MagicDNS name devbox-<name>.ts.<domain> and
+# forward to tailscaled's resolver in this netns (coredns shares ts-infra's
+# namespace). Live boxes resolve, destroyed boxes NXDOMAIN. The explicit
+# answer rule maps the response name back so stub resolvers accept it.
+devbox.lab.${ROOT_DOMAIN} {
+  rewrite stop {
+    name regex (.*)\.devbox\.lab\.${ROOT_DOMAIN} devbox-{1}.ts.${ROOT_DOMAIN}
+    answer name devbox-(.*)\.ts\.${ROOT_DOMAIN} {1}.devbox.lab.${ROOT_DOMAIN}
+  }
+  forward . 100.100.100.100
+  prometheus :9153
+  log
+  errors
+}
+
 lab.${ROOT_DOMAIN} {
   file /etc/coredns/db.lab.domain
   prometheus :9153
