@@ -339,6 +339,25 @@ services:
       - prometheus
     restart: unless-stopped
 
+  # devbox-exporter: polls headscale (docker exec over the socket) for
+  # tag:devbox nodes every 30s and serves devbox_online /
+  # devbox_last_seen_timestamp_seconds on 127.0.0.1:9101 inside ts-infra's
+  # netns (scraped by the sibling prometheus, job `devboxes`). Feeds the
+  # `devclouds` dashboard: online=in use, offline=stopped, absent=destroyed
+  # (clouddevbox destroy deletes the headscale node). No AWS credentials
+  # anywhere on the VPS.
+  devbox-exporter:
+    image: docker:cli
+    network_mode: "service:ts-infra"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - "./tailnet/devbox-exporter/exporter.sh:/exporter.sh:ro"
+    command: sh /exporter.sh
+    depends_on:
+      - ts-infra
+      - headscale
+    restart: unless-stopped
+
   # ts-infra restarts (watchtower image bump, crash, …) leave dependents
   # attached to the orphaned old netns. Two failure modes the watchdog
   # handles:
@@ -361,7 +380,7 @@ services:
     command: >
       sh -c '
         until apk add --no-cache docker-cli-compose >/dev/null 2>&1; do echo "[watchdog] waiting for network to install docker-cli-compose"; sleep 5; done;
-        DEPS="traefik-lab consul coredns alertmanager prometheus grafana loki promtail node-exporter portainer glance blackbox-exporter snmp-exporter outpost-lab";
+        DEPS="traefik-lab consul coredns alertmanager prometheus grafana loki promtail node-exporter portainer glance blackbox-exporter snmp-exporter outpost-lab devbox-exporter";
         ACTION_THRESHOLD=3;
         ACTION_COUNT=0;
         echo "[watchdog] ready, polling dependents every 10s ($$DEPS), drift threshold $$ACTION_THRESHOLD polls";

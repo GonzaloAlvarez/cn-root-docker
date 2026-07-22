@@ -1,0 +1,173 @@
+{
+  "uid": "devclouds",
+  "title": "devclouds",
+  "tags": ["devbox", "cloud"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "editable": true,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "In use",
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(devbox_online == 1) OR vector(0)",
+          "instant": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "green" },
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Stopped",
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(devbox_online == 0) OR vector(0)",
+          "instant": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "orange" },
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Devboxes",
+      "description": "online = EC2 instance running (in use); offline = stopped (clouddevbox stop / autostop); destroyed boxes disappear (their headscale node is deleted).",
+      "gridPos": { "h": 10, "w": 16, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "devbox_online",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "expr": "devbox_last_seen_timestamp_seconds * 1000",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "instance": true,
+              "stack": true
+            },
+            "renameByName": {
+              "devbox": "Name",
+              "Value #A": "Status",
+              "Value #B": "Last seen"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Status" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "1": { "text": "In use", "color": "green", "index": 0 },
+                      "0": { "text": "Stopped", "color": "orange", "index": 1 }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background" }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Last seen" },
+            "properties": [
+              { "id": "unit", "value": "dateTimeAsIso" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "type": "state-timeline",
+      "title": "Online history",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "devbox_online",
+          "legendFormat": "{{devbox}}"
+        }
+      ],
+      "options": {
+        "showValue": "never",
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "fillOpacity": 70, "lineWidth": 0 },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": { "text": "In use", "color": "green", "index": 0 },
+                "0": { "text": "Stopped", "color": "orange", "index": 1 }
+              }
+            }
+          ],
+          "max": 1,
+          "min": 0
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

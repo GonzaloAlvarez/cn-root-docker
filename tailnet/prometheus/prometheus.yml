@@ -259,3 +259,12 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: 127.0.0.1:9116
+
+  # Cloud devboxes (cn-cdk-devbox / clouddevbox). devbox-exporter shares
+  # ts-infra's netns and derives per-box online state from headscale
+  # (tag:devbox nodes). Feeds the `devclouds` dashboard.
+  - job_name: devboxes
+    static_configs:
+      - targets: ["127.0.0.1:9101"]
+        labels:
+          stack: devbox
