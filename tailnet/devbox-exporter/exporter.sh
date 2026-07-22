@@ -19,13 +19,20 @@ done
 mkdir -p /www
 : > /www/metrics
 
+# headscale v0.28 emits snake_case with preauthkey tags under "tags" and
+# last_seen as a protobuf {seconds,nanos} object; older/newer variants use
+# forcedTags + ISO strings. Handle all shapes.
 JQ_PROG='
   (if type == "object" then (.nodes // .machines // []) else . end)
-  | map(select(((.forcedTags // .forced_tags // []) | index("tag:devbox")) != null))
+  | map(select((((.tags // []) + (.forcedTags // .forced_tags // []) + (.validTags // .valid_tags // [])) | index("tag:devbox")) != null))
   | .[]
   | ((.givenName // .given_name // .name // "unknown") | sub("^devbox-"; "")) as $n
+  | ((.lastSeen // .last_seen // 0)
+     | if type == "object" then (.seconds // 0)
+       elif type == "string" then (sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch 0))
+       else . end) as $ls
   | "devbox_online{devbox=\"\($n)\"} \(if .online then 1 else 0 end)",
-    "devbox_last_seen_timestamp_seconds{devbox=\"\($n)\"} \((.lastSeen // .last_seen // "1970-01-01T00:00:00Z") | sub("\\.[0-9]+"; "") | (try fromdateiso8601 catch 0))"
+    "devbox_last_seen_timestamp_seconds{devbox=\"\($n)\"} \($ls)"
 '
 
 poll() {
