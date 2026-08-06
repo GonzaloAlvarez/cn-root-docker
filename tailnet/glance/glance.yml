@@ -44,6 +44,8 @@ pages:
                 links:
                   - title: Authentik
                     url: https://auth.lab.gn.al
+                  - title: Exercises
+                    url: https://exercises.lab.gn.al
                   - title: Filebrowser
                     url: https://filemanager.lab.gn.al
                   - title: Firefox Sync
@@ -229,6 +231,10 @@ pages:
               # when OPENID_AUTO_REDIRECT is false, so the default probe works.
               - title: LibreChat
                 url: https://chat.lab.gn.al
+              # cn-exercises — static exercises-dataset site (nginx on kaiser
+              # via ts-exercises). `/` returns 200 unauth, no check-url needed.
+              - title: Exercises
+                url: https://exercises.lab.gn.al
               # raidnas — DSM 7.2.1 on 10.120.26.20:5000 (subnet-routed via
               # infra-exit). Default probe: `/` returns 200 (DSM login HTML).
               - title: raidnas
