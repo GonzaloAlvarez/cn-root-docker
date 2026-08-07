@@ -209,6 +209,9 @@ scrape_configs:
           # legacy mozilla/syncserver has no /__heartbeat__ (fxa-mono-only endpoint);
           # the tokenserver returns 401 unauthenticated (in valid_status_codes) — proves it's serving.
           - https://sync.lab.gn.al/token/1.0/sync/1.5
+          # cn-sms-service — unauthenticated machine healthz on the webhook
+          # hostname (the UI hostname 302s to Authentik). Full traefik path.
+          - https://smsgw.lab.gn.al/healthz
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -268,3 +271,12 @@ scrape_configs:
       - targets: ["127.0.0.1:9101"]
         labels:
           stack: devbox
+
+  # cn-sms-service (sms-archive on this VPS, ts-infra netns loopback).
+  # /metrics carries counts and timestamps only — never SMS content.
+  - job_name: sms-archive
+    static_configs:
+      - targets: ["127.0.0.1:8092"]
+        labels:
+          stack: cloudnet
+          app: sms-archive

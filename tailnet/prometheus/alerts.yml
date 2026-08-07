@@ -210,3 +210,46 @@ groups:
         annotations:
           summary: "LE cert expiring in <14d: {{ $labels.instance }}"
           description: "TLS cert for {{ $labels.instance }} (job {{ $labels.job }}) expires in {{ $value | humanizeDuration }}. Check traefik-lab ACME renewal: `ssh hs.gn.al 'docker logs cloudnet-traefik-lab-1 --since=2h | grep -i acme'`."
+
+  # ── cn-sms-service (sms-archive on the VPS) ─────────────────────────────
+  # The app is local (127.0.0.1:8092 in ts-infra's netns); the interesting
+  # failure domain is the PHONE side — SMSGate killed by Android battery
+  # optimization, tailscale down, or the phone off — which only shows up as
+  # the heartbeat (system:ping every 5-10m) going stale.
+  - name: sms-archive
+    rules:
+      - alert: SmsArchiveDown
+        expr: up{job="sms-archive"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "sms-archive scrape failing"
+          description: "sms-archive at 127.0.0.1:8092 unreachable for >2m — app crash or ts-infra netns drift (watchdog should self-heal in ~30s). Check `ssh hs.gn.al 'docker logs cloudnet-sms-archive-1 --tail=50'`. While down, webhooks 502 at traefik; SMSGate retries ~2 days, so no message loss yet."
+
+      - alert: SmsPhoneSilent
+        expr: (time() - sms_archive_phone_last_seen_timestamp_seconds) > 1800
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SMSGate phone silent for >30m"
+          description: "No webhook (ping/sms/app-start) from the phone in {{ $value | humanizeDuration }}. The VPS side can be healthy while the phone is not: check the OnePlus 7T — SMSGate running? battery optimization? tailscale connected?"
+
+      - alert: SmsWebhookRejectionSpike
+        expr: sum by (reason) (increase(sms_archive_webhook_rejections_total[15m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "sms-archive rejecting webhooks (reason: {{ $labels.reason }})"
+          description: ">5 webhook rejections ({{ $labels.reason }}) in 15m — signing-key mismatch after a rotation, wrong device, or something probing smsgw.lab.gn.al."
+
+      - alert: SmsDbWriteFailures
+        expr: increase(sms_archive_database_write_failures_total[15m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "sms-archive SQLite writes failing"
+          description: "Webhook handler returning 500 on DB writes (SMSGate is retrying, so messages are delayed not lost). Check disk space and /opt/cloudnet/state/sms ownership (uid 10001)."

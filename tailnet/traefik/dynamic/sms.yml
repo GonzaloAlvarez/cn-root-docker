@@ -1,0 +1,51 @@
+# SMS archive (cn-sms-service; `sms-archive` in this compose project,
+# listening on 127.0.0.1:8092 inside ts-infra's netns).
+#
+#   smsgw.lab.gn.al -- machine endpoint for the phone's SMSGate webhooks.
+#     NO auth middleware: authenticity is HMAC-SHA256 verified in the app.
+#     The rule is path-scoped so ONLY the webhook POST and /healthz are
+#     reachable on this hostname; the app additionally 404s UI paths by
+#     Host header (defense in depth).
+#   sms.lab.gn.al -- read-only browser UI behind Authentik forward-auth
+#     (`authentik-lab` middleware from authentik-forward-auth.yml -- same
+#     file provider, so no @file suffix; Authentik app `sms-lab`, group
+#     infra-admins, provider served by outpost-lab).
+#
+# Priority 100 like the other file-provider routers; the k8s-cluster
+# wildcard catch-all is priority 1.
+http:
+  routers:
+    smsgw-lab:
+      rule: "Host(`smsgw.lab.gn.al`) && (Path(`/v1/webhooks/smsgate`) || Path(`/healthz`))"
+      entryPoints:
+        - websecure
+      service: sms-archive
+      priority: 100
+      tls:
+        certResolver: dns
+        domains:
+          - main: "lab.gn.al"
+            sans:
+              - "*.lab.gn.al"
+
+    sms-ui-lab:
+      rule: "Host(`sms.lab.gn.al`)"
+      entryPoints:
+        - websecure
+      service: sms-archive
+      middlewares:
+        - authentik-lab
+      priority: 100
+      tls:
+        certResolver: dns
+        domains:
+          - main: "lab.gn.al"
+            sans:
+              - "*.lab.gn.al"
+
+  services:
+    sms-archive:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://127.0.0.1:8092"

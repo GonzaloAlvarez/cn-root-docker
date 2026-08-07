@@ -14,6 +14,9 @@ Docker Compose stack for the VPS control plane. Runs on an EC2 instance provisio
 | `consul` | Service registry, bound to tailnet only |
 | `prometheus` | Metrics scraper, bound to tailnet only |
 | `grafana` | Dashboards, bound to tailnet only |
+| `sms-archive` | SMS archive ([cn-sms-service](https://github.com/GonzaloAlvarez/cn-sms-service), built from sibling clone `/opt/cn-sms-service`) — SMSGate webhooks at `smsgw.<LAB_DOMAIN>`, read-only UI at `sms.<LAB_DOMAIN>` behind Authentik forward-auth |
+| `sms-backup` | Nightly online SQLite backup of the SMS archive (7 generations, `state/sms/backups`) |
+| `sms-offsite` | Weekly offen tarball of the SMS backups → S3 + raidnas WebDAV |
 
 ## Configuration
 

@@ -62,6 +62,8 @@ pages:
                     url: https://outline.lab.gn.al
                   - title: raidnas
                     url: https://raidnas.lab.gn.al
+                  - title: SMS Archive
+                    url: https://sms.lab.gn.al
                   - title: SparkyFitness
                     url: https://fitness.lab.gn.al
                   - title: Vaultwarden
@@ -221,6 +223,13 @@ pages:
                 url: https://calibre.lab.gn.al
               - title: Shelfmark
                 url: https://shelfmark.lab.gn.al
+              # cn-sms-service — / on the UI hostname 302s to Authentik
+              # (forward-auth), so probe the unauthenticated machine
+              # healthz on the webhook hostname instead (Outline pattern).
+              # The link still opens the UI.
+              - title: SMS Archive
+                url: https://sms.lab.gn.al
+                check-url: https://smsgw.lab.gn.al/healthz
               # cn-fitness — SparkyFitness frontend nginx returns 200 at /
               # (serves the React SPA shell unauth). The matching alert is
               # TailnetIngressProbeFailed on blackbox-tailnet-http; this

@@ -358,6 +358,95 @@ services:
       - headscale
     restart: unless-stopped
 
+  # SMS archive (cn-sms-service, cloned as sibling /opt/cn-sms-service and
+  # built locally -- watchtower can't pull it, hence the exclude label).
+  # Receives SMSGate-for-Android webhooks from the phone on
+  # smsgw.${LAB_DOMAIN} (HMAC verified in-app, no traefik auth middleware)
+  # and serves the read-only UI on sms.${LAB_DOMAIN} behind the
+  # authentik-lab forward-auth middleware. Routing in
+  # tailnet/traefik/dynamic/sms.yml; SQLite state on the host at
+  # ./state/sms (owned by the container user, uid/gid 10001).
+  sms-archive:
+    build:
+      context: ../cn-sms-service
+    image: cn-sms-service:latest
+    network_mode: "service:ts-infra"   # binds 127.0.0.1:8092 inside the netns
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - SMS_WEBHOOK_SIGNING_KEY=${SMS_WEBHOOK_SIGNING_KEY}
+      - SMS_ALLOWED_DEVICE_ID=${SMS_ALLOWED_DEVICE_ID}
+      - SMS_DB_PATH=/data/sms.db
+      - SMS_UI_HOST=sms.${LAB_DOMAIN}
+      - SMS_WEBHOOK_HOST=smsgw.${LAB_DOMAIN}
+    volumes:
+      - ./state/sms:/data
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+    depends_on:
+      - ts-infra
+    restart: unless-stopped
+
+  # Nightly ONLINE SQLite backup (sqlite3 .backup API -- never cp a live WAL
+  # db) into ./state/sms/backups, 7 generations kept. Self-scheduling loop:
+  # the offen exec-pre-backup hook is dead in this homelab, so the snapshot
+  # schedules itself and sms-offsite only tars the completed snapshots.
+  # No network needed at all.
+  sms-backup:
+    image: cn-sms-service:latest
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    command: ["python", "-m", "app.backup", "--loop", "--at", "03:15", "--retain", "7"]
+    environment:
+      - SMS_DB_PATH=/data/sms.db
+      - SMS_BACKUP_DIR=/data/backups
+    volumes:
+      - ./state/sms:/data
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+    depends_on:
+      - sms-archive
+    restart: unless-stopped
+
+  # Weekly off-site shipping of the sms snapshots -> S3 (shared
+  # cloudnet-lab-storage bucket, prefix sms/) + raidnas WebDAV. MUST share
+  # ts-infra's netns: the VPS host has no tailscale interface, and raidnas
+  # (10.120.26.0/24:5005) is only routable via infra-exit's subnet route
+  # inside the tailnet namespace (ACL: tag:infra -> :5005). Runs Sundays
+  # 04:15 UTC, an hour after the 03:15 sms-backup snapshot.
+  sms-offsite:
+    image: offen/docker-volume-backup:v2.43.4
+    network_mode: "service:ts-infra"
+    environment:
+      - BACKUP_CRON_EXPRESSION=15 4 * * 0
+      - BACKUP_FILENAME=sms-%Y-%m-%dT%H-%M-%S.tar.gz
+      - BACKUP_RETENTION_DAYS=56
+      - AWS_S3_BUCKET_NAME=${BACKUP_S3_BUCKET}
+      - AWS_ACCESS_KEY_ID=${BACKUP_AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${BACKUP_AWS_SECRET_ACCESS_KEY}
+      - AWS_S3_REGION=${BACKUP_AWS_REGION}
+      - AWS_S3_PATH=sms/
+      - WEBDAV_URL=${BACKUP_WEBDAV_URL}
+      - WEBDAV_PATH=/sms/
+      - WEBDAV_USERNAME=${BACKUP_WEBDAV_USER}
+      - WEBDAV_PASSWORD=${BACKUP_WEBDAV_PASSWORD}
+      - NOTIFICATION_URLS=smtp://${SMTP_USERNAME}:${SMTP_PASSWORD}@${SMTP_HOST}:${SMTP_PORT}/?from=${SMTP_FROM}&to=${ALERT_EMAIL}&starttls=yes
+      - NOTIFICATION_LEVEL=info
+    volumes:
+      - ./state/sms/backups:/backup/sms-backups:ro
+    depends_on:
+      - ts-infra
+    restart: unless-stopped
+
   # ts-infra restarts (watchtower image bump, crash, …) leave dependents
   # attached to the orphaned old netns. Two failure modes the watchdog
   # handles:
@@ -380,7 +469,7 @@ services:
     command: >
       sh -c '
         until apk add --no-cache docker-cli-compose >/dev/null 2>&1; do echo "[watchdog] waiting for network to install docker-cli-compose"; sleep 5; done;
-        DEPS="traefik-lab consul coredns alertmanager prometheus grafana loki promtail node-exporter portainer glance blackbox-exporter snmp-exporter outpost-lab devbox-exporter";
+        DEPS="traefik-lab consul coredns alertmanager prometheus grafana loki promtail node-exporter portainer glance blackbox-exporter snmp-exporter outpost-lab devbox-exporter sms-archive sms-offsite";
         ACTION_THRESHOLD=3;
         ACTION_COUNT=0;
         echo "[watchdog] ready, polling dependents every 10s ($$DEPS), drift threshold $$ACTION_THRESHOLD polls";
