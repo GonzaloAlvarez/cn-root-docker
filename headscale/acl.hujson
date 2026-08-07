@@ -30,6 +30,13 @@
     { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["autogroup:internet:*"] },
     { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["10.0.0.0/24:*", "10.1.0.0/16:*", "10.120.22.0/24:*", "10.120.26.0/24:*"] },
 
+    // Personal untagged devices (Mac tailnet-proxy nodes, phones) all live
+    // under gonzaloab@gmail.com; default-deny otherwise blocks same-user
+    // device-to-device traffic. Allow only Termux sshd (:8022) on the
+    // Android phone — widen deliberately if more device-to-device ports
+    // are ever needed.
+    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["gonzaloab@gmail.com:8022"] },
+
     // When a tailnet client selects an exit node from tag:exit, the exit-node
     // itself originates the outbound connection on behalf of the requester.
     // Grant tag:exit egress to the same destinations the operator already has,
