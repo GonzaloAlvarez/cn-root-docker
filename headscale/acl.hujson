@@ -32,10 +32,11 @@
 
     // Personal untagged devices (Mac tailnet-proxy nodes, phones) all live
     // under gonzaloab@gmail.com; default-deny otherwise blocks same-user
-    // device-to-device traffic. Allow only Termux sshd (:8022) on the
-    // Android phone — widen deliberately if more device-to-device ports
-    // are ever needed.
-    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["gonzaloab@gmail.com:8022"] },
+    // device-to-device traffic. Allow only Termux sshd (:8022) and the
+    // SMSGate local-server API (:8080, HTTP Basic — used to manage webhook
+    // registrations from the Mac) on the Android phone — widen deliberately
+    // if more device-to-device ports are ever needed.
+    { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["gonzaloab@gmail.com:8022,8080"] },
 
     // When a tailnet client selects an exit node from tag:exit, the exit-node
     // itself originates the outbound connection on behalf of the requester.
