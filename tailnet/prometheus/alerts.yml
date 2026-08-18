@@ -16,8 +16,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Prometheus target {{ $labels.job }} is down"
-          description: "Scrape target {{ $labels.instance }} (job: {{ $labels.job }}) has been unreachable for more than 2 minutes."
+          summary: "Metrics scrape failing: {{ $labels.job }} ({{ $labels.instance }})"
+          description: "Prometheus on the VPS has been unable to reach the metrics endpoint of job '{{ $labels.job }}' at {{ $labels.instance }} for more than 2 minutes. This means the metrics port is unreachable — the service itself may still be working. Check: (1) is the container/host up? (`docker compose -p cloudnet ps` on the VPS, or the stack on the target host); (2) if the target is a hardcoded IP in prometheus.yml, has the container been recreated with a different address? (compare `docker inspect <container>` with the static_configs entry)."
 
   - name: resources
     rules:

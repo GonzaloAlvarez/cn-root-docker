@@ -24,6 +24,17 @@ services:
   headscale:
     image: headscale/headscale:stable
     command: [ "serve" ]
+    # Pinned bridge IP: prometheus scrapes headscale at 172.18.0.5:9090 by IP
+    # (it shares ts-infra's netns where MagicDNS owns resolv.conf — see
+    # tailnet/prometheus/prometheus.yml). Bridge IPs are otherwise assigned in
+    # container start order, so any dockerd restart can reshuffle them. Hit in
+    # production 2026-08-17 17:23 UTC: a containerd.io/docker-ce apt upgrade
+    # restarted dockerd, watchtower grabbed .5 before headscale (which drifted
+    # to .6), and PrometheusTargetDown (job: headscale) fired while headscale
+    # itself was healthy.
+    networks:
+      default:
+        ipv4_address: 172.18.0.5
     volumes:
       - "./headscale/config.yaml:/etc/headscale/config.yaml:ro"
       - "./headscale/acl.hujson:/etc/headscale/acl.hujson:ro"
@@ -515,6 +526,18 @@ services:
         done
       '
     restart: unless-stopped
+
+networks:
+  # Explicit IPAM (same subnet/gateway Docker had auto-assigned) so static
+  # pins are possible. Dynamic allocation is confined to .128/25 so it can
+  # never collide with pinned addresses like headscale's .5 (same pattern as
+  # cn-roms / cn-librechat — homelab CLAUDE.md §15).
+  default:
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+          ip_range: 172.18.0.128/25
+          gateway: 172.18.0.1
 
 volumes:
   headscale_data:

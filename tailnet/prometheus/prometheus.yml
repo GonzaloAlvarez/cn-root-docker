@@ -50,7 +50,9 @@ scrape_configs:
   # ts-infra's tailscaled overwrites /etc/resolv.conf with MagicDNS, so
   # docker-bridge service names don't resolve from prometheus's namespace
   # (it inherits ts-infra's). extra_hosts can't be used on a container with
-  # network_mode: service:X. Targeting headscale's bridge IP directly.
+  # network_mode: service:X. Targeting headscale's bridge IP directly —
+  # pinned via ipam in docker-compose.yml so dockerd restarts can't
+  # reshuffle it (2026-08-17 incident: unpinned, it drifted to .6).
   - job_name: headscale
     static_configs:
       - targets: ["172.18.0.5:9090"]
