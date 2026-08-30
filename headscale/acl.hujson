@@ -92,14 +92,17 @@
     // Cloud devboxes (cn-cdk-devbox / clouddevbox). Operator devices get
     // full access to every devbox (SSH etc.). Devboxes themselves get
     // narrow LAN reach only:
-    //   - 10.0.0.192:80,443 (pki.lan via infra-exit's 10.0.0.0/24 route)
-    //     so the amun pki role can fetch the step-ca root and trust it
+    //   - 10.0.0.250:80,443 (pki.lan via infra-exit's 10.0.0.0/24 route)
+    //     so the amun pki role can fetch the step-ca root and trust it.
+    //     pki moved off 10.0.0.192 on 2026-08-30 (that IP sat inside the
+    //     MetalLB /27 advert, which shadowed it from the tailnet entirely —
+    //     with .250 this path actually works now)
     //   - 10.1.1.92:22 (neptune.lan) as the designated SSH next-hop into
     //     the LAN; the devbox template pins neptune.lan in /etc/hosts
     // Lab ingress + tailnet DNS are already covered by the
     // src:* -> tag:infra:53,443 rule at the top.
     { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["tag:devbox:*"] },
-    { "action": "accept", "src": ["tag:devbox"], "dst": ["10.0.0.192:80,443"] },
+    { "action": "accept", "src": ["tag:devbox"], "dst": ["10.0.0.250:80,443"] },
     { "action": "accept", "src": ["tag:devbox"], "dst": ["10.1.1.92:22"] }
   ]
 }
