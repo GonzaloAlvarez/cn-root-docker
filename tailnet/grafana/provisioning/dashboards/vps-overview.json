@@ -37,7 +37,7 @@
       "type": "stat",
       "title": "Service status (Prometheus targets)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 1, "w": 24, "h": 5 },
+      "gridPos": { "x": 0, "y": 1, "w": 24, "h": 15 },
       "targets": [
         {
           "expr": "up",
@@ -80,7 +80,7 @@
       "id": 3,
       "type": "row",
       "title": "Host (VPS)",
-      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 1 },
       "collapsed": false,
       "panels": []
     },
@@ -89,7 +89,7 @@
       "type": "gauge",
       "title": "CPU usage",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 7, "w": 6, "h": 6 },
+      "gridPos": { "x": 0, "y": 17, "w": 6, "h": 6 },
       "targets": [
         {
           "expr": "(1 - avg by (instance)(rate(node_cpu_seconds_total{instance=\"127.0.0.1:9100\",mode=\"idle\"}[5m]))) * 100",
@@ -122,7 +122,7 @@
       "type": "gauge",
       "title": "Memory usage",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 6, "y": 7, "w": 6, "h": 6 },
+      "gridPos": { "x": 6, "y": 17, "w": 6, "h": 6 },
       "targets": [
         {
           "expr": "(1 - node_memory_MemAvailable_bytes{instance=\"127.0.0.1:9100\"} / node_memory_MemTotal_bytes{instance=\"127.0.0.1:9100\"}) * 100",
@@ -154,7 +154,7 @@
       "type": "gauge",
       "title": "Disk usage (/)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 12, "y": 7, "w": 6, "h": 6 },
+      "gridPos": { "x": 12, "y": 17, "w": 6, "h": 6 },
       "targets": [
         {
           "expr": "(1 - node_filesystem_avail_bytes{instance=\"127.0.0.1:9100\",mountpoint=\"/\"} / node_filesystem_size_bytes{instance=\"127.0.0.1:9100\",mountpoint=\"/\"}) * 100",
@@ -186,7 +186,7 @@
       "type": "stat",
       "title": "Load average",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 18, "y": 7, "w": 6, "h": 6 },
+      "gridPos": { "x": 18, "y": 17, "w": 6, "h": 6 },
       "targets": [
         { "expr": "node_load1{instance=\"127.0.0.1:9100\"}",  "refId": "A", "legendFormat": "1m" },
         { "expr": "node_load5{instance=\"127.0.0.1:9100\"}",  "refId": "B", "legendFormat": "5m" },
@@ -214,7 +214,7 @@
       "type": "timeseries",
       "title": "Network throughput",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 23, "w": 12, "h": 8 },
       "targets": [
         { "expr": "rate(node_network_receive_bytes_total{instance=\"127.0.0.1:9100\",device!~\"lo|docker.*|veth.*|br-.*|tailscale.*\"}[5m]) * 8",  "refId": "A", "legendFormat": "rx {{device}}" },
         { "expr": "rate(node_network_transmit_bytes_total{instance=\"127.0.0.1:9100\",device!~\"lo|docker.*|veth.*|br-.*|tailscale.*\"}[5m]) * 8", "refId": "B", "legendFormat": "tx {{device}}" }
@@ -236,7 +236,7 @@
       "type": "timeseries",
       "title": "Disk I/O",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 23, "w": 12, "h": 8 },
       "targets": [
         { "expr": "rate(node_disk_read_bytes_total{instance=\"127.0.0.1:9100\",device!~\"loop.*|dm-.*\"}[5m])",    "refId": "A", "legendFormat": "read {{device}}" },
         { "expr": "rate(node_disk_written_bytes_total{instance=\"127.0.0.1:9100\",device!~\"loop.*|dm-.*\"}[5m])", "refId": "B", "legendFormat": "write {{device}}" }
@@ -257,7 +257,7 @@
       "id": 10,
       "type": "row",
       "title": "Headscale",
-      "gridPos": { "x": 0, "y": 21, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 31, "w": 24, "h": 1 },
       "collapsed": false,
       "panels": []
     },
@@ -266,7 +266,7 @@
       "type": "stat",
       "title": "Tailnet nodes",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 22, "w": 6, "h": 6 },
+      "gridPos": { "x": 0, "y": 32, "w": 6, "h": 6 },
       "targets": [
         { "expr": "headscale_nodestore_nodes_total", "refId": "A", "legendFormat": "nodes" }
       ],
@@ -289,7 +289,7 @@
       "type": "timeseries",
       "title": "Headscale map-response rate (poll activity)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 6, "y": 22, "w": 18, "h": 6 },
+      "gridPos": { "x": 6, "y": 32, "w": 18, "h": 6 },
       "targets": [
         { "expr": "rate(headscale_mapresponse_sent_total[5m])",      "refId": "A", "legendFormat": "sent" },
         { "expr": "rate(headscale_mapresponse_generated_total[5m])", "refId": "B", "legendFormat": "generated" },
@@ -311,7 +311,7 @@
       "id": 13,
       "type": "row",
       "title": "Traefik",
-      "gridPos": { "x": 0, "y": 28, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 38, "w": 24, "h": 1 },
       "collapsed": false,
       "panels": []
     },
@@ -320,7 +320,7 @@
       "type": "timeseries",
       "title": "Requests/sec by HTTP code",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 29, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 39, "w": 12, "h": 8 },
       "targets": [
         { "expr": "sum by (code)(rate(traefik_entrypoint_requests_total[5m]))", "refId": "A", "legendFormat": "{{code}}" }
       ],
@@ -341,7 +341,7 @@
       "type": "timeseries",
       "title": "p95 request latency by service",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 12, "y": 29, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 39, "w": 12, "h": 8 },
       "targets": [
         { "expr": "histogram_quantile(0.95, sum by (service, le)(rate(traefik_service_request_duration_seconds_bucket[5m])))", "refId": "A", "legendFormat": "{{service}}" }
       ],
@@ -361,7 +361,7 @@
       "id": 16,
       "type": "row",
       "title": "Consul",
-      "gridPos": { "x": 0, "y": 37, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 47, "w": 24, "h": 1 },
       "collapsed": false,
       "panels": []
     },
@@ -370,7 +370,7 @@
       "type": "stat",
       "title": "Consul cluster",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 38, "w": 6, "h": 6 },
+      "gridPos": { "x": 0, "y": 48, "w": 6, "h": 6 },
       "targets": [
         { "expr": "consul_consul_members_servers", "refId": "A", "legendFormat": "servers" },
         { "expr": "consul_consul_members_clients", "refId": "B", "legendFormat": "clients" },
@@ -402,7 +402,7 @@
       "type": "timeseries",
       "title": "Consul catalog activity (queries/sec)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 6, "y": 38, "w": 18, "h": 6 },
+      "gridPos": { "x": 6, "y": 48, "w": 18, "h": 6 },
       "targets": [
         { "expr": "sum(rate(consul_catalog_register_count[5m]))",   "refId": "A", "legendFormat": "registers" },
         { "expr": "sum(rate(consul_catalog_deregister_count[5m]))", "refId": "B", "legendFormat": "deregisters" }
@@ -423,7 +423,7 @@
       "id": 19,
       "type": "row",
       "title": "Prometheus & Alertmanager",
-      "gridPos": { "x": 0, "y": 44, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 54, "w": 24, "h": 1 },
       "collapsed": false,
       "panels": []
     },
@@ -432,7 +432,7 @@
       "type": "stat",
       "title": "Active alerts (firing)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 45, "w": 6, "h": 6 },
+      "gridPos": { "x": 0, "y": 55, "w": 6, "h": 6 },
       "targets": [
         { "expr": "sum(ALERTS{alertstate=\"firing\"}) or vector(0)", "refId": "A", "legendFormat": "firing" }
       ],
@@ -465,7 +465,7 @@
       "type": "stat",
       "title": "Targets up / total",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 6, "y": 45, "w": 6, "h": 6 },
+      "gridPos": { "x": 6, "y": 55, "w": 6, "h": 6 },
       "targets": [
         { "expr": "sum(up)",      "refId": "A", "legendFormat": "up" },
         { "expr": "count(up)",    "refId": "B", "legendFormat": "total" }
@@ -491,7 +491,7 @@
       "type": "table",
       "title": "Firing alerts (details)",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 51, "w": 24, "h": 7 },
+      "gridPos": { "x": 0, "y": 61, "w": 24, "h": 7 },
       "targets": [
         {
           "expr": "ALERTS{alertstate=\"firing\"}",
@@ -539,7 +539,7 @@
       "type": "timeseries",
       "title": "Samples appended/sec",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 12, "y": 45, "w": 12, "h": 6 },
+      "gridPos": { "x": 12, "y": 55, "w": 12, "h": 6 },
       "targets": [
         { "expr": "rate(prometheus_tsdb_head_samples_appended_total[5m])", "refId": "A", "legendFormat": "samples/s" }
       ],
@@ -559,7 +559,7 @@
       "id": 23,
       "type": "row",
       "title": "Loki",
-      "gridPos": { "x": 0, "y": 51, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 61, "w": 24, "h": 1 },
       "collapsed": false,
       "panels": []
     },
@@ -568,7 +568,7 @@
       "type": "timeseries",
       "title": "Log lines ingested/sec",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 0, "y": 52, "w": 12, "h": 6 },
+      "gridPos": { "x": 0, "y": 62, "w": 12, "h": 6 },
       "targets": [
         { "expr": "sum(rate(loki_distributor_lines_received_total[5m]))", "refId": "A", "legendFormat": "lines/s" }
       ],
@@ -589,7 +589,7 @@
       "type": "timeseries",
       "title": "Bytes ingested/sec",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "x": 12, "y": 52, "w": 12, "h": 6 },
+      "gridPos": { "x": 12, "y": 62, "w": 12, "h": 6 },
       "targets": [
         { "expr": "sum(rate(loki_distributor_bytes_received_total[5m]))", "refId": "A", "legendFormat": "bytes/s" }
       ],
@@ -609,7 +609,7 @@
       "id": 26,
       "type": "row",
       "title": "Logs",
-      "gridPos": { "x": 0, "y": 58, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 68, "w": 24, "h": 1 },
       "collapsed": false,
       "panels": []
     },
@@ -618,7 +618,7 @@
       "type": "logs",
       "title": "Headscale recent logs",
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "x": 0, "y": 59, "w": 24, "h": 10 },
+      "gridPos": { "x": 0, "y": 69, "w": 24, "h": 10 },
       "targets": [
         { "expr": "{container=\"cloudnet-headscale-1\"}", "refId": "A" }
       ],
