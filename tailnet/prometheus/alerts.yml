@@ -215,7 +215,11 @@ groups:
   # The app is local (127.0.0.1:8092 in ts-infra's netns); the interesting
   # failure domain is the PHONE side — SMSGate killed by Android battery
   # optimization, tailscale down, or the phone off — which only shows up as
-  # the heartbeat (system:ping every 5-10m) going stale.
+  # the heartbeat (system:ping) going stale. Android Doze batches the pings
+  # to roughly ONE PER HOUR when the phone is idle (measured 2026-09-06;
+  # the app-configured 5-10m interval only holds while the phone is awake),
+  # so the silence threshold is 2h = two missed idle heartbeats. Anything
+  # tighter flaps hourly.
   - name: sms-archive
     rules:
       - alert: SmsArchiveDown
@@ -228,12 +232,12 @@ groups:
           description: "sms-archive at 127.0.0.1:8092 unreachable for >2m — app crash or ts-infra netns drift (watchdog should self-heal in ~30s). Check `ssh hs.gn.al 'docker logs cloudnet-sms-archive-1 --tail=50'`. While down, webhooks 502 at traefik; SMSGate retries ~2 days, so no message loss yet."
 
       - alert: SmsPhoneSilent
-        expr: (time() - sms_archive_phone_last_seen_timestamp_seconds) > 1800
+        expr: (time() - sms_archive_phone_last_seen_timestamp_seconds) > 7200
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "SMSGate phone silent for >30m"
+          summary: "SMSGate phone silent for >2h"
           description: "No webhook (ping/sms/app-start) from the phone in {{ $value | humanizeDuration }}. The VPS side can be healthy while the phone is not: check the OnePlus 7T — SMSGate running? battery optimization? tailscale connected?"
 
       - alert: SmsWebhookRejectionSpike
