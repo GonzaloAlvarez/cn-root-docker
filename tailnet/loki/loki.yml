@@ -26,7 +26,20 @@ schema_config:
         prefix: index_
         period: 24h
 
+# Retention: without this block Loki keeps chunks forever (measured
+# 2026-09-06: 12 GB back to March on the VPS's 40 GB disk). The compactor
+# owns deletion; delete_request_store is mandatory in Loki 3.x when
+# retention_enabled is true.
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 50
+  delete_request_store: filesystem
+
 limits_config:
+  retention_period: 720h  # 30d — matches reject_old_samples_max_age
   reject_old_samples: true
   reject_old_samples_max_age: 720h
   # Allow promtail to backfill log lines that pre-date the stream's
