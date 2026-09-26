@@ -86,7 +86,7 @@ services:
       # auth-lab router → neptune.lan) preserves the original Host header.
       # Without this, traefik-lab rewrites X-Forwarded-Host on the hairpin
       # leg and the Authentik outpost 404s because no provider matches
-      # auth.lab.gn.al as external_host (it matches roms.lab.gn.al).
+      # auth.lab.gn.al as external_host (it matches e.g. shelfmark.lab.gn.al).
       # 127.0.0.0/8 covers the loopback hairpin variant if auth.lab.gn.al
       # ever resolves to 127.0.0.1 inside ts-infra (MagicDNS quirk).
       - "--entrypoints.websecure.forwardedHeaders.trustedIPs=100.64.0.0/10,127.0.0.0/8,10.1.0.0/16"
@@ -116,17 +116,18 @@ services:
       - consul
     restart: unless-stopped
 
-  # Authentik proxy outpost — DEDICATED to the tailnet ingress for RomM
-  # (and any future *.lab.gn.al service that wants forward-auth SSO).
+  # Authentik proxy outpost — DEDICATED to the tailnet ingresses that use
+  # forward-auth SSO (shelfmark-lab, calibre-lab, sms-lab; RomM moved to
+  # native OIDC on 2026-09-26 because this gate blocks companion apps).
   # Lives in ts-infra's netns so traefik-lab can hit its auth endpoint on
-  # localhost (no inter-container TCP needed). Its `config.authentik_host_browser`
-  # is set to https://auth.lab.gn.al by setup-romm-proxy-sso.sh, so 302s
-  # from this outpost land on the tailnet-resolvable Authentik URL — the
-  # embedded outpost on neptune (configured with auth.neptune.lan) keeps
-  # serving the LAN ingress for roms.kaiser.lan.
+  # localhost (no inter-container TCP needed). Its `config.authentik_host`
+  # / `authentik_host_browser` are pinned to https://auth.lab.gn.al by the
+  # cn-authentik setup-*-proxy-sso.sh scripts, so 302s from this outpost
+  # land on the tailnet-resolvable Authentik URL — the embedded outpost on
+  # neptune (auth.neptune.lan) keeps serving the *.kaiser.lan ingresses.
   #
-  # AUTHENTIK_TOKEN comes from the outpost-lab token in Authentik; obtain
-  # via `setup-romm-proxy-sso.sh` (printed at the end). AUTHENTIK_INSECURE
+  # AUTHENTIK_TOKEN comes from the outpost-lab token in Authentik
+  # (`GET /core/tokens/ak-outpost-<pk>-api/view_key/`). AUTHENTIK_INSECURE
   # is `true` because the call to auth.lab.gn.al hairpins through this
   # same traefik-lab to neptune (`tls: insecureSkipVerify: true` on the
   # `auth-lab` service in dynamic/auth.yml), and the outpost would

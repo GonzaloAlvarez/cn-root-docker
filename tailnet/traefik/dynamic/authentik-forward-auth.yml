@@ -6,16 +6,22 @@
 #
 # `address` points at the DEDICATED tailnet outpost (`outpost-lab`,
 # defined in cn-root-docker/docker-compose.yml). The outpost shares
-# ts-infra's network namespace with traefik-lab, so 127.0.0.1:9300 is the
+# ts-infra's network namespace with traefik-lab, so 127.0.0.1:9000 is the
 # outpost container's HTTP listener — no inter-container TCP, no DNS.
 #
 # Why a dedicated outpost (vs. reusing the embedded outpost on neptune):
 # Authentik's outpost has ONE `authentik_host_browser` field — there's
 # no per-provider override. The embedded outpost on neptune is pinned to
-# auth.neptune.lan for the LAN ingress (roms.kaiser.lan, which gets the
-# step-ca leaf). This outpost is pinned to auth.lab.gn.al so the 302
-# from a no-session forward-auth call lands on the LE-wildcard URL that
-# tailnet/MagicDNS actually resolves. See setup-romm-proxy-sso.sh.
+# auth.neptune.lan for the LAN ingresses (*.kaiser.lan, step-ca leaves).
+# This outpost is pinned to auth.lab.gn.al so the 302 from a no-session
+# forward-auth call lands on the LE-wildcard URL that tailnet/MagicDNS
+# actually resolves. Consumers today: shelfmark-lab, calibre-lab
+# (cn-authentik/setup-books-proxy-sso.sh) and sms-lab (setup-sms-proxy-sso.sh).
+#
+# NOT for apps with native/companion clients: this gate answers any
+# non-browser request (e.g. Argosy's `Authorization: Bearer rmm_…` Client
+# API Tokens) with an Authentik HTML page. RomM left it for native OIDC on
+# 2026-09-26 (cn-authentik/setup-roms-oidc.sh).
 
 http:
   middlewares:

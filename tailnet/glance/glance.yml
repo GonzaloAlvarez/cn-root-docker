@@ -211,8 +211,8 @@ pages:
               # needed. Cheap unauth alternative: /System/Info/Public → 200 JSON.
               - title: Jellyfin
                 url: https://jellyfin.lab.gn.al
-              # cn-roms — RomM serves the Vue SPA at /. Auth wall returns 200,
-              # so the default probe works without a check-url override.
+              # cn-roms — RomM serves the Vue SPA (login page) at / → 200, so
+              # the default probe works without a check-url override.
               - title: RomM
                 url: https://roms.lab.gn.al
               # cn-books — Calibre-Web / Shelfmark / Audiobookshelf all return
