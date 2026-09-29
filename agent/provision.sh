@@ -11,7 +11,9 @@
 #   provision.sh host-key                       # VPS ed25519 host key line for clients' known_hosts
 #   provision.sh identity ensure                # Authentik user + Outline Member + Memories collection (needs OUTLINE_ADMIN_TOKEN)
 #   provision.sh token issue [--expires-days 90] # mint the Outline token + install it INTO the gateway (server-side injection); clients get no token
-#   provision.sh token list | token revoke       # list keys / delete all keys + blank the gateway token
+#   provision.sh token issue --local <label> [--expires-days 365] [--write <file>]  # per-machine key for the outlinememory skill (minimal scope; shown once or written 0600; never stored)
+#   provision.sh token list                      # every key of the agent user (gateway agent-injected-* and local agent-local-*)
+#   provision.sh token revoke [--local <label>]  # delete ALL keys (incl. local) + blank the gateway token | delete one machine's local keys only
 #   provision.sh bundle [--client <label>]      # reprint host key + tunnel command + URL + allowlist (client needs NO token)
 #   provision.sh test --client <label> --key <private-key>          # e2e: client sends no credential; gateway injects
 #   provision.sh revoke [--client <label> | --all]
@@ -41,6 +43,11 @@ API_PORT=8093
 LOCAL_TEST_PORT=${AGENT_LOCAL_TEST_PORT:-18093}
 SCOPES=(auth.info collections.list collections.info collections.documents documents.list documents.info documents.search
         documents.create documents.update documents.archive documents.restore documents.delete)
+# Minimal scope for per-machine LOCAL keys (`token issue --local`, used by the Claude/Codex
+# outlinememory skill in ~/dev/skill-outlinememory): read the tree, add pages. Deliberately
+# no update/delete — a leaked ~/.outline-token can only add pages under Memories. Re-issue
+# with a wider scope if an "append to an existing memory" feature is ever wanted.
+LOCAL_SCOPES=(auth.info collections.list collections.documents documents.create documents.info)
 KEYS_FILE="$HERE/sshd/authorized_keys"
 LEDGER="$HERE/clients.md"
 RULES_FILE="$REPO/tailnet/prometheus/agent-rules.yml"
@@ -115,6 +122,8 @@ ledger_init() {
 # Registered agent clients (METADATA ONLY — no secrets)
 
 Maintained by `agent/provision.sh`. One row per client. Token values are never stored.
+Rows `local-<label>` are per-machine keys minted by `token issue --local <label>` for the
+Claude/Codex outlinememory skill (no SSH key; minimal scope; not part of gateway rotation).
 
 | client | ssh key fingerprint | token name | token issued | token expires |
 |---|---|---|---|---|
@@ -150,6 +159,12 @@ rules_regenerate() {
       [[ -n "$c" && -n "$tn" && -n "$ex" && "$c" != client ]] || continue
       [[ "$c" =~ ^-+$ ]] && continue
       if [[ $any -eq 0 ]]; then echo '    rules:'; any=1; fi
+      local desc
+      if [[ "$c" == local-* ]]; then
+        desc="The LOCAL Outline token ${tn} (outlinememory skill on ${c#local-}) expires on ${ex}. Rotate ON THAT MACHINE with: agent/provision.sh token issue --local ${c#local-} --write ~/.outline-token (mints a new key, deletes the previous one with the same label). The gateway is unaffected."
+      else
+        desc="The gateway-injected Outline token ${tn} expires on ${ex}. Rotate in place with: agent/provision.sh token issue (mints a new one, installs it into the gateway, rotates out the old). Clients are unaffected — they hold no token."
+      fi
       cat <<RULE
       - alert: AgentTokenExpiringSoon
         expr: vector($(iso_to_epoch "$ex")) - time() < 14 * 86400
@@ -158,14 +173,14 @@ rules_regenerate() {
           client: "${c}"
         annotations:
           summary: "agent Outline token (${tn}) expires ${ex}"
-          description: "The gateway-injected Outline token ${tn} expires on ${ex}. Rotate in place with: agent/provision.sh token issue (mints a new one, installs it into the gateway, rotates out the old). Clients are unaffected — they hold no token."
+          description: "${desc}"
 RULE
     done < <(grep -E '^\| ' "$LEDGER" 2>/dev/null || true)
     [[ $any -eq 1 ]] || echo '    rules: []'
   } >"$RULES_FILE"
 }
 git_commit_push() {  # <message>
-  ( cd "$REPO" && git add -A agent tailnet/prometheus/agent-rules.yml && { git diff --cached --quiet && ok "nothing to commit" || { git commit -q -m "$1" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>" && git push -q origin HEAD && chg "committed + pushed: $1"; }; } )
+  ( cd "$REPO" && git add -A agent tailnet/prometheus/agent-rules.yml && { git diff --cached --quiet && ok "nothing to commit" || { git commit -q -m "$1" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>" && git push -q origin HEAD && chg "committed + pushed: $1"; }; } )
 }
 
 # vps_set_token <secret|""> — install (or blank) the injected Outline token in the
@@ -339,19 +354,65 @@ cmd_identity() {
 
 # The token is the GATEWAY's, injected server-side; clients never hold it. `issue`
 # mints a fresh Outline key, installs it into the VPS gateway, verifies injection,
-# then rotates out the previous keys. `revoke` deletes every key and blanks the
-# gateway. There is no per-client token and nothing to hand out.
+# then rotates out the previous gateway keys (agent-injected-*). `revoke` deletes
+# every key and blanks the gateway. There is no per-client token and nothing to hand out.
+#
+# Exception: `token issue --local <label>` mints a per-MACHINE key (agent-local-<label>-*)
+# for the operator's own Claude Code / Codex `outlinememory` skill. It is held on that
+# machine (~/.outline-token), carries LOCAL_SCOPES only, is never stored here, and is
+# ignored by gateway rotation (prefix filter). `token revoke --local <label>` removes it.
+cmd_token_issue_local() {  # <label> <days> <write-file|"">
+  local label="$1" days="$2" write_file="$3"
+  cmd_preflight
+  log "login as ${IDENTITY} (minting a local key for ${label})"
+  local jwt me uid role old name exp payload resp secret id
+  jwt=$(authentik_login_session) || die "headless OIDC login failed"
+  me=$(outline_call "$jwt" auth.info); uid=$(jq -r .data.user.id <<<"$me"); role=$(jq -r .data.user.role <<<"$me"); ok "session for ${uid} (role ${role})"
+  old=$(outline_call "$jwt" apiKeys.list '{"limit":100}' | jq -r --arg p "agent-local-${label}-" '.data[] | select(.name | startswith($p)) | .id')
+  name="agent-local-${label}-$(date -u +%Y%m%d%H%M%S)"; exp=$(iso_plus_days "$days")
+  payload=$(jq -cn --arg n "$name" --arg e "$exp" --argjson s "$(printf '%s\n' "${LOCAL_SCOPES[@]}" | jq -R . | jq -sc .)" '{name:$n, expiresAt:$e, scope:$s}')
+  log "apiKeys.create ${name} (expires ${exp}; scope: ${LOCAL_SCOPES[*]})"
+  resp=$(outline_call "$jwt" apiKeys.create "$payload")
+  [[ "$(HTTP)" == 200 ]] || { authentik_deactivate; die "apiKeys.create failed (HTTP $(HTTP)): $(head -c 300 <<<"$resp")"; }
+  secret=$(jq -r '.data.secret // .data.value // empty' <<<"$resp"); [[ -n "$secret" ]] || { authentik_deactivate; die "no secret in apiKeys.create response"; }
+  outline_call "$secret" auth.info >/dev/null; [[ "$(HTTP)" == 200 ]] && ok "new key verified (auth.info → 200)" || warn "auth.info with the new key → HTTP $(HTTP)"
+  for id in $old; do outline_call "$jwt" apiKeys.delete "$(jq -cn --arg id "$id" '{id:$id}')" >/dev/null; [[ "$(HTTP)" == 200 ]] && chg "rotated out previous local key ${id}" || warn "delete ${id} → HTTP $(HTTP)"; done
+  authentik_deactivate
+  if [[ -n "$write_file" ]]; then
+    ( umask 077; printf '%s\n' "$secret" >"$write_file" ) && chmod 600 "$write_file" || die "could not write ${write_file}"
+    ok "token written to ${write_file} (mode 0600) — it is not shown and not stored anywhere else"
+  else
+    printf '\n==== local Outline token %s — copy it now, it is not shown again ====\n%s\n==== end ====\n\n' "$name" "$secret"
+  fi
+  ledger_set "local-${label}" "" "$name" "$(today)" "${exp%%T*}"
+  git_commit_push "agent: local Outline token ${name} issued for ${label} (expiry rule)"
+  ok "Local key active for ${label} (expires ${exp%%T*}). Rotate: token issue --local ${label} [--write <file>]; revoke: token revoke --local ${label}"
+}
+
 cmd_token() {
   local sub="${1:-}"; shift || true
   case "$sub" in
     issue)
-      local days=90
-      while (( $# )); do case "$1" in --expires-days) days="$2"; shift 2 ;; --client) shift 2 ;; *) die "unknown arg $1" ;; esac; done
+      local days="" local_label="" write_file=""
+      while (( $# )); do case "$1" in
+        --expires-days) days="$2"; shift 2 ;;
+        --local) local_label="$2"; shift 2 ;;
+        --write) write_file="$2"; shift 2 ;;
+        --client) shift 2 ;;
+        *) die "unknown arg $1" ;; esac; done
+      if [[ -n "$local_label" ]]; then
+        [[ "$local_label" =~ ^[a-z0-9][a-z0-9._-]{0,31}$ ]] || die "--local label must match ^[a-z0-9][a-z0-9._-]{0,31}\$ (e.g. \$(hostname -s | tr A-Z a-z))"
+        [[ -z "$write_file" || ! -e "$write_file" || -f "$write_file" ]] || die "--write target exists and is not a regular file: ${write_file}"
+        cmd_token_issue_local "$local_label" "${days:-365}" "$write_file"; return
+      fi
+      [[ -z "$write_file" ]] || die "--write only applies to --local"
+      days=${days:-90}
       cmd_preflight; require_admin
       log "login as ${IDENTITY}"
       local jwt me uid role existing; jwt=$(authentik_login_session) || die "headless OIDC login failed"
       me=$(outline_call "$jwt" auth.info); uid=$(jq -r .data.user.id <<<"$me"); role=$(jq -r .data.user.role <<<"$me"); ok "session for ${uid} (role ${role})"
-      existing=$(outline_call "$jwt" apiKeys.list '{"limit":100}' | jq -r '.data[].id')   # rotate these out after the new one is live
+      # Rotate out ONLY previous gateway keys; per-machine agent-local-* keys must survive.
+      existing=$(outline_call "$jwt" apiKeys.list '{"limit":100}' | jq -r '.data[] | select(.name | startswith("agent-injected-")) | .id')
       local name exp payload resp secret
       name="agent-injected-$(date -u +%Y%m%d%H%M%S)"; exp=$(iso_plus_days "$days")
       payload=$(jq -cn --arg n "$name" --arg e "$exp" --argjson s "$(printf '%s\n' "${SCOPES[@]}" | jq -R . | jq -sc .)" '{name:$n, expiresAt:$e, scope:$s}')
@@ -381,9 +442,24 @@ cmd_token() {
       echo "Outline API keys for ${IDENTITY} (the active one is injected by the gateway):"
       admin_call apiKeys.list "$(jq -cn --arg u "$(jq -r .id <<<"$u")" '{userId:$u, limit:100}')" | jq -r '.data[] | [.name, (.expiresAt // "never"), (.lastActiveAt // "unused")] | @tsv' | column -t ;;
     revoke)
-      # Delete every agent key (self-only) AND blank the gateway token → fully disabled.
+      local rlabel=""
+      while (( $# )); do case "$1" in --local) rlabel="$2"; shift 2 ;; *) die "unknown arg $1" ;; esac; done
       cmd_preflight
-      local jwt ids; jwt=$(authentik_login_session) || die "could not open an agent session to delete keys"
+      local jwt ids names c; jwt=$(authentik_login_session) || die "could not open an agent session to delete keys"
+      if [[ -n "$rlabel" ]]; then
+        # One machine's local keys only; the gateway token and other machines are untouched.
+        ids=$(outline_call "$jwt" apiKeys.list '{"limit":100}' | jq -r --arg p "agent-local-${rlabel}-" '.data[] | select(.name | startswith($p)) | .id')
+        if [[ -z "$ids" ]]; then ok "no local keys for ${rlabel}"; else
+          for id in $ids; do outline_call "$jwt" apiKeys.delete "$(jq -cn --arg id "$id" '{id:$id}')" >/dev/null; [[ "$(HTTP)" == 200 ]] && chg "revoked ${id}" || warn "delete ${id} → HTTP $(HTTP)"; done
+        fi
+        authentik_deactivate
+        ledger_remove "local-${rlabel}"
+        git_commit_push "agent: local Outline token for ${rlabel} revoked"
+        ok "local keys for ${rlabel} deleted (remove ~/.outline-token on that machine); gateway token untouched"; return
+      fi
+      # Delete every agent key (self-only) AND blank the gateway token → fully disabled.
+      names=$(outline_call "$jwt" apiKeys.list '{"limit":100}' | jq -r '[.data[].name] | join(", ")')
+      [[ -z "$names" ]] || warn "deleting EVERY agent key, including per-machine local skill keys: ${names}"
       ids=$(outline_call "$jwt" apiKeys.list '{"limit":100}' | jq -r '.data[].id')
       if [[ -z "$ids" ]]; then ok "no Outline keys to delete"; else
         for id in $ids; do outline_call "$jwt" apiKeys.delete "$(jq -cn --arg id "$id" '{id:$id}')" >/dev/null; [[ "$(HTTP)" == 200 ]] && chg "revoked ${id}" || warn "delete ${id} → HTTP $(HTTP)"; done
@@ -392,8 +468,9 @@ cmd_token() {
       log "blanking the gateway token on ${VPS}"
       vps_set_token ""; ok "gateway token blanked (API now 401s at Outline until re-issued)"
       ledger_set "outline-token" - "" "" ""
-      git_commit_push "agent: server-side Outline token revoked" ;;
-    *) die "usage: token issue [--expires-days N] | list | revoke" ;;
+      for c in $(grep -oE '^\| local-[^ |]+' "$LEDGER" 2>/dev/null | sed 's/^| //'); do ledger_remove "$c"; done
+      git_commit_push "agent: server-side Outline token revoked (all keys deleted)" ;;
+    *) die "usage: token issue [--expires-days N] [--local <label> [--write <file>]] | list | revoke [--local <label>]" ;;
   esac
 }
 
@@ -526,6 +603,6 @@ case "${1:-}" in
   bundle)    cmd_bundle "$@" ;;
   test)      shift; cmd_test "$@" ;;
   revoke)    shift; cmd_revoke "$@" ;;
-  -h|--help|"") sed -n '2,24p' "$0" ;;
+  -h|--help|"") sed -n '2,26p' "$0" ;;
   *) die "unknown command: $1" ;;
 esac
