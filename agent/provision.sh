@@ -425,8 +425,9 @@ cmd_test() {
     warn "no --token given: skipping authenticated checks"
   fi
   ssh -S "$ctl" -O exit -l "$IDENTITY" "$VPS" 2>/dev/null || true
-  log "public leak check"
-  check "https://${VPS}/api/auth.info (traefik-public)" 404 "$(c -X POST "https://${VPS}/api/auth.info")"
+  log "public leak check (traefik-public must not know the gateway; bare /api/* on hs.gn.al is headscale's own API → 401, unrelated)"
+  check "https://${VPS}/api/auth.info with Host outline.lab.gn.al" 404 "$(c -X POST -H 'Host: outline.lab.gn.al' "https://${VPS}/api/auth.info")"
+  check "https://${VPS}/healthz/upstream" 404 "$(c "https://${VPS}/healthz/upstream")"
   echo; echo "  PASS ${pass}  FAIL ${fail}"; [[ $fail -eq 0 ]]
 }
 
