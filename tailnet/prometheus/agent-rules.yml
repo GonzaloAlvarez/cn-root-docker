@@ -10,5 +10,13 @@ groups:
           severity: info
           client: "muse"
         annotations:
-          summary: "agent token for client 'muse' expires 2026-12-28"
-          description: "Token agent-muse-20260929 expires on 2026-12-28. Rotate: agent/provision.sh token issue --client muse, hand the new bundle to the client, then token revoke the old one."
+          summary: "agent Outline token (agent-muse-20260929) expires 2026-12-28"
+          description: "The gateway-injected Outline token agent-muse-20260929 expires on 2026-12-28. Rotate in place with: agent/provision.sh token issue (mints a new one, installs it into the gateway, rotates out the old). Clients are unaffected — they hold no token."
+      - alert: AgentTokenExpiringSoon
+        expr: vector(1798416000) - time() < 14 * 86400
+        labels:
+          severity: info
+          client: "outline-token"
+        annotations:
+          summary: "agent Outline token (agent-injected-20260929155116) expires 2026-12-28"
+          description: "The gateway-injected Outline token agent-injected-20260929155116 expires on 2026-12-28. Rotate in place with: agent/provision.sh token issue (mints a new one, installs it into the gateway, rotates out the old). Clients are unaffected — they hold no token."
