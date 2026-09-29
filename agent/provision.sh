@@ -289,20 +289,34 @@ cmd_identity() {
   else ok "default access none, sharing off"; fi
   admin_call collections.add_user "$(jq -cn --arg id "$cid" --arg u "$uid" '{id:$id, userId:$u, permission:"read_write"}')" >/dev/null
   [[ "$(HTTP)" == 200 ]] || die "collections.add_user failed (HTTP $(HTTP))"; ok "${IDENTITY} is read_write member of ${COLLECTION}"
-  log "4/6 role → guest"
-  ol_set_role "$uid" guest; ok "role guest"
+  log "4/6 role → member (Outline Guests are read-only; write needs Member)"
+  ol_set_role "$uid" member; ok "role member"
+  log "4b/6 privating every OTHER collection (Members reach team-default collections; confine to ${COLLECTION})"
+  local others; others=$(admin_call collections.list '{"limit":100}' | jq -r --arg id "$cid" '.data[] | select(.id!=$id and .permission!=null) | [.id,.name] | @tsv')
+  if [[ -n "$others" ]]; then
+    while IFS=$'''	''' read -r oid oname; do
+      [[ -n "$oid" ]] || continue
+      admin_call collections.update "$(jq -cn --arg id "$oid" '{id:$id, permission:null}')" >/dev/null
+      [[ "$(HTTP)" == 200 ]] && chg "collection '''${oname}''' default access → none (was team-default; explicit members only)" || die "collections.update ${oname} failed (HTTP $(HTTP))"
+    done <<<"$others"
+  else ok "no team-default collections to private"; fi
   log "5/6 verification as ${IDENTITY}"
   local names; names=$(outline_call "$jwt" collections.list '{"limit":100}' | jq -r '[.data[].name] | sort | join(",")')
-  [[ "$names" == "$COLLECTION" ]] && ok "collections.list → only ${COLLECTION}" || die "collections.list returned: '${names}' (expected only ${COLLECTION}). Make the others private or fix the role."
+  [[ "$names" == "$COLLECTION" ]] && ok "collections.list → only ${COLLECTION}" || die "collections.list returned: '''${names}''' (expected only ${COLLECTION})."
   local doc did
   doc=$(outline_call "$jwt" documents.create "$(jq -cn --arg c "$cid" '{collectionId:$c, title:"agent provisioning smoke test", text:"created by agent/provision.sh identity ensure — safe to delete", publish:true}')")
-  [[ "$(HTTP)" == 200 ]] && ok "documents.create in ${COLLECTION} → 200 (guest + read_write can write)" || die "documents.create in ${COLLECTION} failed (HTTP $(HTTP)): $(head -c 200 <<<"$doc") — Guest may not be allowed to write; see README fallback"
+  [[ "$(HTTP)" == 200 ]] && ok "documents.create in ${COLLECTION} → 200 (member + read_write can write)" || die "documents.create in ${COLLECTION} failed (HTTP $(HTTP)): $(head -c 200 <<<"$doc")"
   did=$(jq -r .data.id <<<"$doc")
-  outline_call "$jwt" documents.delete "$(jq -cn --arg id "$did" '{id:$id, permanent:true}')" >/dev/null; [[ "$(HTTP)" == 200 ]] && ok "smoke document deleted" || warn "could not delete smoke document ${did} (HTTP $(HTTP)) — delete by hand"
+  # A read_write member can trash (soft-delete) its own docs; permanent purge is admin-only.
+  outline_call "$jwt" documents.delete "$(jq -cn --arg id "$did" '{id:$id}')" >/dev/null
+  [[ "$(HTTP)" == 200 ]] && ok "documents.delete (trash) as ${IDENTITY} → 200" || warn "agent soft-delete returned HTTP $(HTTP)"
+  admin_call documents.delete "$(jq -cn --arg id "$did" '{id:$id, permanent:true}')" >/dev/null
+  [[ "$(HTTP)" == 200 ]] && ok "smoke document purged (admin cleanup)" || warn "could not purge smoke document ${did} (HTTP $(HTTP)) — delete by hand"
+  # An admin-only collection the agent is not a member of must be invisible/forbidden.
   local other; other=$(admin_call collections.list '{"limit":100}' | jq -r --arg n "$COLLECTION" '[.data[] | select(.name!=$n)][0].id // empty')
   if [[ -n "$other" ]]; then
     outline_call "$jwt" documents.list "$(jq -cn --arg c "$other" '{collectionId:$c}')" >/dev/null
-    [[ "$(HTTP)" == 403 ]] && ok "documents.list on another collection → 403" || die "expected 403 on another collection, got HTTP $(HTTP)"
+    [[ "$(HTTP)" == 403 || "$(HTTP)" == 404 ]] && ok "documents.list on a non-member collection → $(HTTP)" || die "expected 403/404 on a non-member collection, got HTTP $(HTTP)"
   fi
   log "6/6 deactivate Authentik user"
   authentik_deactivate
@@ -326,16 +340,10 @@ cmd_token() {
       payload=$(jq -cn --arg n "$name" --arg e "$exp" --argjson s "$(printf '%s\n' "${SCOPES[@]}" | jq -R . | jq -sc .)" '{name:$n, expiresAt:$e, scope:$s}')
       log "apiKeys.create ${name} (expires ${exp})"
       resp=$(outline_call "$jwt" apiKeys.create "$payload")
-      if [[ "$(HTTP)" != 200 ]]; then
-        warn "apiKeys.create refused as ${role} (HTTP $(HTTP)) — temporarily promoting to member"
-        ol_set_role "$uid" member
-        resp=$(outline_call "$jwt" apiKeys.create "$payload")
-        ol_set_role "$uid" guest; ok "role restored to guest"
-        [[ "$(HTTP)" == 200 ]] || die "apiKeys.create still failing (HTTP $(HTTP)): $(head -c 300 <<<"$resp")"
-      fi
+      [[ "$(HTTP)" == 200 ]] || die "apiKeys.create failed (HTTP $(HTTP)) as role ${role}: $(head -c 300 <<<"$resp"). If members are blocked from creating keys, enable it in Outline Settings → Security."
       secret=$(jq -r '.data.secret // .data.value // empty' <<<"$resp"); [[ -n "$secret" ]] || die "no secret in apiKeys.create response: $(head -c 300 <<<"$resp")"
       log "verifying the new token"
-      me=$(outline_call "$secret" auth.info); [[ "$(HTTP)" == 200 && "$(jq -r .data.user.role <<<"$me")" == guest ]] && ok "token works, role guest" || die "token verification failed (HTTP $(HTTP), role $(jq -r '.data.user.role // "?"' <<<"$me"))"
+      me=$(outline_call "$secret" auth.info); [[ "$(HTTP)" == 200 ]] && ok "token works (user $(jq -r .data.user.name <<<"$me"), role $(jq -r .data.user.role <<<"$me"))" || die "token verification failed (HTTP $(HTTP))"
       authentik_deactivate
       local cid; cid=$(ol_collection_id "$COLLECTION")
       ledger_set "$client" - "$name" "$(today)" "${exp%%T*}"
