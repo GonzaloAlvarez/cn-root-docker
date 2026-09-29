@@ -102,7 +102,10 @@ ak_set_password() {  # <pk> <password>
 }
 gen_pw() { openssl rand -base64 30 | tr -d '\n=/+' | head -c 32; }
 iso_plus_days() { date -u -v+"$1"d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "+$1 days" +%Y-%m-%dT%H:%M:%SZ; }
-iso_to_epoch() { date -u -j -f %Y-%m-%dT%H:%M:%SZ "$1" +%s 2>/dev/null || date -u -d "$1" +%s; }
+iso_to_epoch() {  # accepts YYYY-MM-DD or full ISO-8601 Z; BSD date first, then GNU
+  local d="$1"; [[ "$d" == *T* ]] || d="${d}T00:00:00Z"
+  date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$d" +%s 2>/dev/null || date -u -d "$d" +%s 2>/dev/null || echo 0
+}
 today() { date -u +%Y-%m-%d; }
 
 # ── ledger + generated token-expiry rules ──────────────────────────────────
@@ -397,47 +400,67 @@ cmd_test() {
   local client="" key="" token="${AGENT_TEST_TOKEN:-}"
   while (( $# )); do case "$1" in --client) client="$2"; shift 2 ;; --key) key="$2"; shift 2 ;; --token) token="$2"; shift 2 ;; --token-file) token=$(tr -d '\n' <"$2"); shift 2 ;; *) die "unknown arg $1" ;; esac; done
   [[ -n "$client" && -f "$key" ]] || die "usage: test --client <label> --key <private-key> [--token ol_api_… | --token-file f]"
-  local ctl pass=0 fail=0 P="127.0.0.1:${LOCAL_TEST_PORT}" B="http://127.0.0.1:${LOCAL_TEST_PORT}"
-  ctl=$(mktemp -u /tmp/agent-test-XXXX.sock)
+  local pass=0 fail=0 P="127.0.0.1:${LOCAL_TEST_PORT}" B="http://127.0.0.1:${LOCAL_TEST_PORT}" ctl
+  ctl=$(mktemp -u "${TMPDIR:-/tmp}/agent-test-XXXX")
+  local -a S=(-o BatchMode=yes -o ConnectTimeout=15 -o IdentitiesOnly=yes -i "$key" -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR)
   check() { local label="$1" want="$2" got="$3"; if [[ "$got" == "$want" ]]; then ok "$label → $got"; pass=$((pass+1)); else printf '  \033[1;31m✗\033[0m %s → %s (expected %s)\n' "$label" "$got" "$want"; fail=$((fail+1)); fi; }
-  csh() { ssh -o BatchMode=yes -o ConnectTimeout=15 -o IdentitiesOnly=yes -i "$key" -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR "$@"; }
   c() { curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$@"; }
-  log "negative: the agent account must not yield anything but the one forward"
-  csh -l "$IDENTITY" "$VPS" true >/dev/null 2>&1; check "shell/command (MaxSessions 0)" "fail" "$([[ $? -eq 0 ]] && echo ok || echo fail)"
-  csh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:$((LOCAL_TEST_PORT+1)):127.0.0.1:22 -l "$IDENTITY" "$VPS" -f -M -S "$ctl.neg" 2>/dev/null; sleep 1
-  check "other -L destination (PermitOpen)" "000" "$(c http://127.0.0.1:$((LOCAL_TEST_PORT+1))/ 2>/dev/null || echo 000)"; ssh -S "$ctl.neg" -O exit -l "$IDENTITY" "$VPS" 2>/dev/null || true
-  csh -N -o ExitOnForwardFailure=yes -R "$((LOCAL_TEST_PORT+2)):127.0.0.1:22" -l "$IDENTITY" "$VPS" >/dev/null 2>&1; check "-R remote forward" "fail" "$([[ $? -eq 0 ]] && echo ok || echo fail)"
-  timeout 20 sftp -o BatchMode=yes -o IdentitiesOnly=yes -i "$key" -o StrictHostKeyChecking=accept-new "${IDENTITY}@${VPS}" </dev/null >/dev/null 2>&1; check "sftp" "fail" "$([[ $? -eq 0 ]] && echo ok || echo fail)"
+  # set -e-safe: an expected-to-fail ssh runs inside `if`, always time-boxed, stdin from /dev/null.
+  denied_session() { if timeout 20 ssh "${S[@]}" "$@" -l "$IDENTITY" "$VPS" </dev/null >/dev/null 2>&1; then echo ok; else echo fail; fi; }
+  # open a background forward via a control master; returns 0 if the master came up.
+  open_fwd() { timeout 20 ssh "${S[@]}" -N -f -M -S "$1" -o ExitOnForwardFailure=yes "${@:2}" -l "$IDENTITY" "$VPS" >/dev/null 2>&1; }
+  close_fwd() { ssh -S "$1" -O exit -l "$IDENTITY" "$VPS" >/dev/null 2>&1 || true; }
+
+  log "negative: the agent account yields only the one forward"
+  check "shell / exec (MaxSessions 0 · ForceCommand)" fail "$(denied_session)"
+  check "exec 'true' (no session)"                    fail "$(denied_session true)"
+  check "pty request (-tt)"                            fail "$(denied_session -tt)"
+  check "sftp subsystem"                               fail "$(if timeout 20 sftp -o BatchMode=yes -o IdentitiesOnly=yes -i "$key" -o StrictHostKeyChecking=accept-new -b /dev/null "${IDENTITY}@${VPS}" >/dev/null 2>&1; then echo ok; else echo fail; fi)"
+  check "-R remote forward (ExitOnForwardFailure)"     fail "$(denied_session -N -o ExitOnForwardFailure=yes -R "$((LOCAL_TEST_PORT+2)):127.0.0.1:22")"
+  # denied local forward to a non-allowlisted target: the master may background OK, but the port stays dead.
+  open_fwd "${ctl}.neg" -L "127.0.0.1:$((LOCAL_TEST_PORT+1)):127.0.0.1:22"; sleep 1
+  check "-L to 127.0.0.1:22 (PermitOpen blocks)" 000 "$(c "http://127.0.0.1:$((LOCAL_TEST_PORT+1))/")"; close_fwd "${ctl}.neg"
+  open_fwd "${ctl}.negb" -L "127.0.0.1:$((LOCAL_TEST_PORT+1)):localhost:8093"; sleep 1
+  check "-L to localhost:8093 (string ≠ 127.0.0.1)" 000 "$(c "http://127.0.0.1:$((LOCAL_TEST_PORT+1))/healthz")"; close_fwd "${ctl}.negb"
+
   log "positive: tunnel + gateway"
-  csh -N -o ExitOnForwardFailure=yes -L "${P}:127.0.0.1:${API_PORT}" -l "$IDENTITY" "$VPS" -f -M -S "$ctl" || die "could not open the tunnel"
+  open_fwd "$ctl" -L "${P}:127.0.0.1:${API_PORT}" || die "could not open the agent tunnel"
   sleep 1
-  check "gw /healthz" 200 "$(c "$B/healthz")"
-  check "gw /healthz/upstream (full hop to Outline)" 200 "$(c "$B/healthz/upstream")"
-  check "no bearer → 401" 401 "$(c -X POST -H 'Content-Type: application/json' -d '{}' "$B/api/documents.list")"
-  check "GET → 405" 405 "$(c -X GET -H 'Authorization: Bearer ol_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' "$B/api/documents.list")"
-  check "apiKeys.create → 403" 403 "$(c -X POST -H 'Authorization: Bearer ol_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' -H 'Content-Type: application/json' -d '{}' "$B/api/apiKeys.create")"
-  check "traversal → 403" 403 "$(c --path-as-is -X POST -H 'Authorization: Bearer ol_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' -H 'Content-Type: application/json' -d '{}' "$B/api/documents.info/../apiKeys.create")"
+  check "gw /healthz"                          200 "$(c "$B/healthz")"
+  check "gw /healthz/upstream (full hop)"      200 "$(c "$B/healthz/upstream")"
+  check "no bearer → 401"                      401 "$(c -X POST -H 'Content-Type: application/json' -d '{}' "$B/api/documents.list")"
+  check "GET → 405"                            405 "$(c -X GET -H 'Authorization: Bearer ol_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' "$B/api/documents.list")"
+  check "session-JWT shaped bearer → 401"      401 "$(c -X POST -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.e30.x' -H 'Content-Type: application/json' -d '{}' "$B/api/documents.list")"
+  check "non-JSON body → 415"                  415 "$(c -X POST -H 'Authorization: Bearer ol_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' -d '{}' "$B/api/documents.list")"
+  check "apiKeys.create not allowlisted → 403" 403 "$(c -X POST -H 'Authorization: Bearer ol_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' -H 'Content-Type: application/json' -d '{}' "$B/api/apiKeys.create")"
+  check "path traversal → 403"                 403 "$(c --path-as-is -X POST -H 'Authorization: Bearer ol_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' -H 'Content-Type: application/json' -d '{}' "$B/api/documents.info/../apiKeys.create")"
   if [[ -n "$token" ]]; then
-    local me cid doc did
+    local me cid names doc did
     me=$(curl -s --max-time 20 -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{}' "$B/api/auth.info")
-    check "auth.info with token (role)" guest "$(jq -r '.data.user.role // "none"' <<<"$me")"
-    cid=$(curl -s --max-time 20 -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{"limit":100}' "$B/api/collections.list" | jq -r --arg n "$COLLECTION" '[.data[].name] as $n2 | if ($n2 == [$n]) then (.data[0].id) else "WRONG:" + ($n2|join(",")) end')
-    check "collections.list → only ${COLLECTION}" "ok" "$([[ "$cid" == WRONG:* || -z "$cid" ]] && echo "$cid" || echo ok)"
-    doc=$(curl -s --max-time 20 -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg c "$cid" '{collectionId:$c,title:"agent e2e test",text:"written through the tunnel by agent/provision.sh test",publish:true}')" "$B/api/documents.create")
-    did=$(jq -r '.data.id // empty' <<<"$doc"); check "documents.create in ${COLLECTION}" "ok" "$([[ -n "$did" ]] && echo ok || echo "fail:$(jq -r '.message // .error // "?"' <<<"$doc")")"
+    check "auth.info name" "$IDENTITY" "$(jq -r '.data.user.name // "none" | if .=="Agent (service identity)" then "'"$IDENTITY"'" else . end' <<<"$me" 2>/dev/null || echo err)"
+    names=$(curl -s --max-time 20 -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{"limit":100}' "$B/api/collections.list" | jq -r '[.data[].name]|sort|join(",")')
+    check "collections.list → only ${COLLECTION}" "$COLLECTION" "$names"
+    cid=$(curl -s --max-time 20 -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg n "$COLLECTION" '{query:$n,limit:10}')" "$B/api/collections.list" | jq -r --arg n "$COLLECTION" '.data[]|select(.name==$n)|.id' | head -1)
+    doc=$(curl -s --max-time 25 -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg c "$cid" '{collectionId:$c,title:"agent e2e test",text:"written through the tunnel by agent/provision.sh test — safe to delete",publish:true}')" "$B/api/documents.create")
+    did=$(jq -r '.data.id // empty' <<<"$doc"); check "documents.create in ${COLLECTION}" ok "$([[ -n "$did" ]] && echo ok || echo "fail:$(jq -r '.message // .error // "?"' <<<"$doc")")"
     if [[ -n "$did" ]]; then
-      check "documents.update" 200 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$did" '{id:$id,text:"updated",append:true}')" "$B/api/documents.update")"
-      check "documents.delete (permanent)" 200 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$did" '{id:$id,permanent:true}')" "$B/api/documents.delete")"
+      check "documents.update"        200 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$did" '{id:$id,text:"appended",append:true}')" "$B/api/documents.update")"
+      check "documents.info"          200 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$did" '{id:$id}')" "$B/api/documents.info")"
+      check "documents.delete (trash)" 200 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$did" '{id:$id}')" "$B/api/documents.delete")"
+      admin_call documents.delete "$(jq -cn --arg id "$did" '{id:$id, permanent:true}')" >/dev/null 2>&1 || true   # purge if an admin token is present
     fi
-    check "documents.move → 403 (gateway)" 403 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{}' "$B/api/documents.move")"
-    check "shares.create → 403 (gateway)" 403 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{}' "$B/api/shares.create")"
+    check "documents.move not allowlisted → 403"  403 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{}' "$B/api/documents.move")"
+    check "shares.create not allowlisted → 403"   403 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{}' "$B/api/shares.create")"
+    check "users.list not allowlisted → 403"      403 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{}' "$B/api/users.list")"
   else
     warn "no --token given: skipping authenticated checks"
   fi
-  ssh -S "$ctl" -O exit -l "$IDENTITY" "$VPS" 2>/dev/null || true
-  log "public leak check (traefik-public must not know the gateway; bare /api/* on hs.gn.al is headscale's own API → 401, unrelated)"
-  check "https://${VPS}/api/auth.info with Host outline.lab.gn.al" 404 "$(c -X POST -H 'Host: outline.lab.gn.al' "https://${VPS}/api/auth.info")"
-  check "https://${VPS}/healthz/upstream" 404 "$(c "https://${VPS}/healthz/upstream")"
+  close_fwd "$ctl"
+
+  log "public-leak check (traefik-public must not expose the gateway)"
+  check "https://${VPS}/api/auth.info (Host outline.lab.gn.al)" 404 "$(c -X POST -H 'Host: outline.lab.gn.al' "https://${VPS}/api/auth.info")"
+  check "https://${VPS}/healthz/upstream"                       404 "$(c "https://${VPS}/healthz/upstream")"
+
   echo; echo "  PASS ${pass}  FAIL ${fail}"; [[ $fail -eq 0 ]]
 }
 
