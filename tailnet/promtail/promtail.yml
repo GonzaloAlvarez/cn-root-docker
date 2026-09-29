@@ -40,15 +40,17 @@ scrape_configs:
                 source: denied
                 template: '{{ if regexMatch "^[45]" .status }}1{{ else }}0{{ end }}'
             - metrics:
-                agent_gw_requests_total:
+                gw_requests_total:
                   type: Counter
+                  prefix: agent_
                   description: "agent-api-gw requests, all statuses"
                   max_idle_duration: 24h
                   config:
                     match_all: true
                     action: inc
-                agent_gw_denied_total:
+                gw_denied_total:
                   type: Counter
+                  prefix: agent_
                   description: "agent-api-gw 4xx/5xx responses"
                   max_idle_duration: 24h
                   source: denied
@@ -82,15 +84,17 @@ scrape_configs:
             - regex:
                 expression: '(?P<agent_ssh_failed>Failed publickey for agent from|not in PubkeyAcceptedAlgorithms)'
             - metrics:
-                agent_ssh_accepted_total:
+                ssh_accepted_total:
                   type: Counter
+                  prefix: agent_
                   description: "agent publickey logins accepted"
                   max_idle_duration: 24h
                   source: agent_ssh_accepted
                   config:
                     action: inc
-                agent_ssh_failed_total:
+                ssh_failed_total:
                   type: Counter
+                  prefix: agent_
                   description: "agent publickey logins rejected (wrong key or non-ed25519)"
                   max_idle_duration: 24h
                   source: agent_ssh_failed
