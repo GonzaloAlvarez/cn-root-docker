@@ -3,4 +3,12 @@
 # before the recorded expiry so the token can be rotated in time.
 groups:
   - name: agent-token-expiry
-    rules: []
+    rules:
+      - alert: AgentTokenExpiringSoon
+        expr: vector(1798416000) - time() < 14 * 86400
+        labels:
+          severity: info
+          client: "muse"
+        annotations:
+          summary: "agent token for client 'muse' expires 2026-12-28"
+          description: "Token agent-muse-20260929 expires on 2026-12-28. Rotate: agent/provision.sh token issue --client muse, hand the new bundle to the client, then token revoke the old one."
