@@ -9,11 +9,11 @@
 #   provision.sh ssh-key remove (<fingerprint> | --client <label>) [--no-deploy]
 #   provision.sh ssh-key list
 #   provision.sh host-key                       # VPS ed25519 host key line for clients' known_hosts
-#   provision.sh identity ensure                # Authentik user + Outline Guest user + Memories collection (needs OUTLINE_ADMIN_TOKEN)
-#   provision.sh token issue --client <label> [--expires-days 90]   # prints the client bundle ONCE
-#   provision.sh token list | token revoke (<id> | --client <label> | --all)
-#   provision.sh bundle [--client <label>]      # reprint host key + tunnel command + URL + allowlist (no token)
-#   provision.sh test --client <label> --key <private-key> [--token <ol_api_…> | --token-file <f>]
+#   provision.sh identity ensure                # Authentik user + Outline Member + Memories collection (needs OUTLINE_ADMIN_TOKEN)
+#   provision.sh token issue [--expires-days 90] # mint the Outline token + install it INTO the gateway (server-side injection); clients get no token
+#   provision.sh token list | token revoke       # list keys / delete all keys + blank the gateway token
+#   provision.sh bundle [--client <label>]      # reprint host key + tunnel command + URL + allowlist (client needs NO token)
+#   provision.sh test --client <label> --key <private-key>          # e2e: client sends no credential; gateway injects
 #   provision.sh revoke [--client <label> | --all]
 #
 # Admin credential: OUTLINE_ADMIN_TOKEN env var or --admin-token-file <f> — an
@@ -157,15 +157,26 @@ rules_regenerate() {
           severity: info
           client: "${c}"
         annotations:
-          summary: "agent token for client '${c}' expires ${ex}"
-          description: "Token ${tn} expires on ${ex}. Rotate: agent/provision.sh token issue --client ${c}, hand the new bundle to the client, then token revoke the old one."
+          summary: "agent Outline token (${tn}) expires ${ex}"
+          description: "The gateway-injected Outline token ${tn} expires on ${ex}. Rotate in place with: agent/provision.sh token issue (mints a new one, installs it into the gateway, rotates out the old). Clients are unaffected — they hold no token."
 RULE
     done < <(grep -E '^\| ' "$LEDGER" 2>/dev/null || true)
     [[ $any -eq 1 ]] || echo '    rules: []'
   } >"$RULES_FILE"
 }
 git_commit_push() {  # <message>
-  ( cd "$REPO" && git add -A agent tailnet/prometheus/agent-rules.yml && { git diff --cached --quiet && ok "nothing to commit" || { git commit -q -m "$1" -m "Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>" && git push -q origin HEAD && chg "committed + pushed: $1"; }; } )
+  ( cd "$REPO" && git add -A agent tailnet/prometheus/agent-rules.yml && { git diff --cached --quiet && ok "nothing to commit" || { git commit -q -m "$1" -m "Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>" && git push -q origin HEAD && chg "committed + pushed: $1"; }; } )
+}
+
+# vps_set_token <secret|""> — install (or blank) the injected Outline token in the
+# VPS gateway. The secret is piped over stdin (never in argv/history); .env is
+# backed up and rewritten in place (perms preserved), then only agent-api-gw is
+# force-recreated so it re-reads the value. An empty secret disables the gateway
+# (Outline then 401s) without removing anything.
+vps_set_token() {
+  local secret="$1"
+  printf '%s' "$secret" | vps_ssh "cd ${VPS_REPO} && test -s .env || { echo 'FATAL: /opt/cloudnet/.env missing or empty' >&2; exit 1; } && umask 077 && cp -a .env .env.bak.agent && { grep -v '^AGENT_OUTLINE_TOKEN=' .env.bak.agent; printf 'AGENT_OUTLINE_TOKEN=%s\n' \"\$(cat)\"; } > .env && docker compose up -d --force-recreate --no-deps agent-api-gw >/dev/null 2>&1 && echo installed" \
+    | grep -q installed || die "failed to install the token into the VPS gateway"
 }
 
 # ── preflight ──────────────────────────────────────────────────────────────
@@ -326,67 +337,73 @@ cmd_identity() {
   echo; echo "  identity ready: Outline user ${IDENTITY} (guest) · collection ${COLLECTION} (${cid}) · Authentik user deactivated"
 }
 
+# The token is the GATEWAY's, injected server-side; clients never hold it. `issue`
+# mints a fresh Outline key, installs it into the VPS gateway, verifies injection,
+# then rotates out the previous keys. `revoke` deletes every key and blanks the
+# gateway. There is no per-client token and nothing to hand out.
 cmd_token() {
   local sub="${1:-}"; shift || true
   case "$sub" in
     issue)
-      local client="" days=90
-      while (( $# )); do case "$1" in --client) client="$2"; shift 2 ;; --expires-days) days="$2"; shift 2 ;; *) die "unknown arg $1" ;; esac; done
-      [[ -n "$client" ]] || die "usage: token issue --client <label> [--expires-days N]"
-      grep -qE " client=${client}( |$)" "$KEYS_FILE" || warn "no ssh key registered for client=${client} yet (ssh-key add)"
+      local days=90
+      while (( $# )); do case "$1" in --expires-days) days="$2"; shift 2 ;; --client) shift 2 ;; *) die "unknown arg $1" ;; esac; done
       cmd_preflight; require_admin
       log "login as ${IDENTITY}"
-      local jwt me uid role; jwt=$(authentik_login_session) || die "headless OIDC login failed"
+      local jwt me uid role existing; jwt=$(authentik_login_session) || die "headless OIDC login failed"
       me=$(outline_call "$jwt" auth.info); uid=$(jq -r .data.user.id <<<"$me"); role=$(jq -r .data.user.role <<<"$me"); ok "session for ${uid} (role ${role})"
+      existing=$(outline_call "$jwt" apiKeys.list '{"limit":100}' | jq -r '.data[].id')   # rotate these out after the new one is live
       local name exp payload resp secret
-      name="agent-${client}-$(date -u +%Y%m%d)"; exp=$(iso_plus_days "$days")
+      name="agent-injected-$(date -u +%Y%m%d%H%M%S)"; exp=$(iso_plus_days "$days")
       payload=$(jq -cn --arg n "$name" --arg e "$exp" --argjson s "$(printf '%s\n' "${SCOPES[@]}" | jq -R . | jq -sc .)" '{name:$n, expiresAt:$e, scope:$s}')
       log "apiKeys.create ${name} (expires ${exp})"
       resp=$(outline_call "$jwt" apiKeys.create "$payload")
-      [[ "$(HTTP)" == 200 ]] || die "apiKeys.create failed (HTTP $(HTTP)) as role ${role}: $(head -c 300 <<<"$resp"). If members are blocked from creating keys, enable it in Outline Settings → Security."
+      [[ "$(HTTP)" == 200 ]] || die "apiKeys.create failed (HTTP $(HTTP)): $(head -c 300 <<<"$resp")"
       secret=$(jq -r '.data.secret // .data.value // empty' <<<"$resp"); [[ -n "$secret" ]] || die "no secret in apiKeys.create response: $(head -c 300 <<<"$resp")"
-      log "verifying the new token"
-      me=$(outline_call "$secret" auth.info); [[ "$(HTTP)" == 200 ]] && ok "token works (user $(jq -r .data.user.name <<<"$me"), role $(jq -r .data.user.role <<<"$me"))" || die "token verification failed (HTTP $(HTTP))"
       authentik_deactivate
-      local cid; cid=$(ol_collection_id "$COLLECTION")
-      ledger_set "$client" - "$name" "$(today)" "${exp%%T*}"
-      git_commit_push "agent: token ${name} issued (metadata + expiry rule)"
-      print_bundle "$client" "$secret" "$exp" "$cid" ;;
+      log "installing the token into the gateway on ${VPS} (server-side injection)"
+      vps_set_token "$secret"; ok "token installed; agent-api-gw recreated"
+      log "verifying: a gateway call with NO client credential must now succeed"
+      local vhttp who
+      vhttp=$(vps_ssh "curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:${API_PORT}/api/auth.info")
+      [[ "$vhttp" == 200 ]] || die "gateway injection check failed (HTTP ${vhttp}) — token not active"
+      who=$(vps_ssh "curl -s --max-time 20 -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:${API_PORT}/api/auth.info" | jq -r '.data.user.name + " (" + .data.user.role + ")"')
+      ok "gateway injects the token → auth.info returns ${who}"
+      if [[ -n "$existing" ]]; then
+        jwt=$(authentik_login_session) || die "could not reopen a session to rotate out old keys"
+        for id in $existing; do outline_call "$jwt" apiKeys.delete "$(jq -cn --arg id "$id" '{id:$id}')" >/dev/null; [[ "$(HTTP)" == 200 ]] && chg "rotated out old key ${id}" || warn "delete ${id} → HTTP $(HTTP)"; done
+        authentik_deactivate
+      fi
+      ledger_set "outline-token" - "$name" "$(today)" "${exp%%T*}"
+      git_commit_push "agent: server-side Outline token ${name} installed (expiry rule)"
+      echo; ok "Server-side token active. Clients need ONLY the SSH tunnel — no token to hand out." ;;
     list)
       require_admin; local u; u=$(ol_user); [[ -n "$u" ]] || die "Outline user ${IDENTITY} not found"
-      admin_call apiKeys.list "$(jq -cn --arg u "$(jq -r .id <<<"$u")" '{userId:$u, limit:100}')" | jq -r '.data[] | [.id, .name, (.expiresAt // "never"), (.lastActiveAt // "unused")] | @tsv' | column -t ;;
+      echo "Outline API keys for ${IDENTITY} (the active one is injected by the gateway):"
+      admin_call apiKeys.list "$(jq -cn --arg u "$(jq -r .id <<<"$u")" '{userId:$u, limit:100}')" | jq -r '.data[] | [.name, (.expiresAt // "never"), (.lastActiveAt // "unused")] | @tsv' | column -t ;;
     revoke)
-      # apiKeys.delete is SELF-ONLY in Outline (an admin cannot delete another
-      # user's key), so revoke logs in AS the agent and deletes its own keys.
-      local sel="${1:-}" lbl="${2:-}"
-      [[ -n "$sel" ]] || die "usage: token revoke (<id> | --client <label> | --all)"
-      local jwt; jwt=$(authentik_login_session) || die "could not open an agent session to delete keys"
-      local all; all=$(outline_call "$jwt" apiKeys.list '{"limit":100}')
-      local ids
-      case "$sel" in
-        --all)    ids=$(jq -r '.data[].id' <<<"$all") ;;
-        --client) ids=$(jq -r --arg p "agent-${lbl}-" '.data[] | select(.name|startswith($p)) | .id' <<<"$all") ;;
-        *)        ids="$sel" ;;
-      esac
-      if [[ -z "$ids" ]]; then ok "no matching keys to revoke"; else
+      # Delete every agent key (self-only) AND blank the gateway token → fully disabled.
+      cmd_preflight
+      local jwt ids; jwt=$(authentik_login_session) || die "could not open an agent session to delete keys"
+      ids=$(outline_call "$jwt" apiKeys.list '{"limit":100}' | jq -r '.data[].id')
+      if [[ -z "$ids" ]]; then ok "no Outline keys to delete"; else
         for id in $ids; do outline_call "$jwt" apiKeys.delete "$(jq -cn --arg id "$id" '{id:$id}')" >/dev/null; [[ "$(HTTP)" == 200 ]] && chg "revoked ${id}" || warn "delete ${id} → HTTP $(HTTP)"; done
       fi
       authentik_deactivate
-      case "$sel" in
-        --client) ledger_set "$lbl" - "" "" "" ;;
-        --all)    while read -r c; do [[ -n "$c" && "$c" != client ]] && ! [[ "$c" =~ ^-+$ ]] && ledger_set "$c" - "" "" ""; done < <(awk -F'|' '/^\| /{print $2}' "$LEDGER" | xargs -n1 2>/dev/null || true) ;;
-      esac
-      git_commit_push "agent: token(s) revoked ${sel} ${lbl}" ;;
-    *) die "usage: token issue|list|revoke" ;;
+      log "blanking the gateway token on ${VPS}"
+      vps_set_token ""; ok "gateway token blanked (API now 401s at Outline until re-issued)"
+      ledger_set "outline-token" - "" "" ""
+      git_commit_push "agent: server-side Outline token revoked" ;;
+    *) die "usage: token issue [--expires-days N] | list | revoke" ;;
   esac
 }
 
-print_bundle() {  # <client> <token|""> <expires|""> <collectionId|"">
-  local client="$1" token="${2:-}" exp="${3:-}" cid="${4:-}" hk fp
+print_bundle() {  # [client-label] — the client bundle. NO token: the gateway injects it server-side.
+  local client="${1:-<client>}" hk fp cid=""
   hk=$(ssh-keyscan -t ed25519 -T 10 "$VPS" 2>/dev/null | grep -v '^#' | head -1); fp=$(ssh-keygen -lf /dev/stdin <<<"$hk" | awk '{print $2}')
+  [[ -n "$ADMIN_TOKEN" ]] && cid=$(ol_collection_id "$COLLECTION" 2>/dev/null || true)
   cat <<B
 
-== agent client bundle · client=${client} · issued $(today)${exp:+ · token expires ${exp%%T*}} ==
+== agent client bundle · client=${client} · issued $(today) ==
 SSH endpoint : ${IDENTITY}@${VPS}:22   (ed25519 host key ${fp})
 known_hosts  : ${hk}
 Tunnel       : ssh -N -o BatchMode=yes -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=yes \\
@@ -395,21 +412,22 @@ Tunnel       : ssh -N -o BatchMode=yes -o ExitOnForwardFailure=yes -o StrictHost
                  -L 127.0.0.1:${API_PORT}:127.0.0.1:${API_PORT} ${IDENTITY}@${VPS}
                (autossh: autossh -M 0 -N <same options>)
 API base URL : http://127.0.0.1:${API_PORT}/api      (POST only, Content-Type: application/json)   backend: outline
-Token        : ${token:-<not shown — use: token issue --client ${client}>}${token:+   (shown ONCE — not stored on the homelab side)}
+Credential   : NONE on the client. Authentication IS the SSH tunnel key; the gateway
+               injects the Outline token server-side. Do NOT send an Authorization header.
 Collection   : ${COLLECTION}${cid:+  id=${cid}}   (the only collection this identity can see or write)
 Allowed      : ${SCOPES[*]}
 Limits       : 512 KB body · 10 r/s · gateway errors are {"ok":false,"error":...}; Outline errors are Outline JSON
-Smoke test   : curl -sS -X POST http://127.0.0.1:${API_PORT}/api/auth.info -H "Authorization: Bearer \$TOKEN" \\
+Smoke test   : curl -sS -X POST http://127.0.0.1:${API_PORT}/api/auth.info \\
                  -H 'Content-Type: application/json' -d '{}'
 B
 }
-cmd_bundle() { local client="${2:-<client>}"; local cid=""; [[ -n "$ADMIN_TOKEN" ]] && cid=$(ol_collection_id "$COLLECTION" 2>/dev/null || true); print_bundle "$client" "" "" "$cid"; }
+cmd_bundle() { print_bundle "${2:-<client>}"; }
 
 # ── end-to-end test from the Mac acting as a client ─────────────────────────
 cmd_test() {
-  local client="" key="" token="${AGENT_TEST_TOKEN:-}"
-  while (( $# )); do case "$1" in --client) client="$2"; shift 2 ;; --key) key="$2"; shift 2 ;; --token) token="$2"; shift 2 ;; --token-file) token=$(tr -d '\n' <"$2"); shift 2 ;; *) die "unknown arg $1" ;; esac; done
-  [[ -n "$client" && -f "$key" ]] || die "usage: test --client <label> --key <private-key> [--token ol_api_… | --token-file f]"
+  local client="" key=""
+  while (( $# )); do case "$1" in --client) client="$2"; shift 2 ;; --key) key="$2"; shift 2 ;; --token|--token-file) shift 2 ;; *) die "unknown arg $1" ;; esac; done
+  [[ -n "$client" && -f "$key" ]] || die "usage: test --client <label> --key <private-key>   (no token — the gateway injects it)"
   local pass=0 fail=0 P="127.0.0.1:${LOCAL_TEST_PORT}" B="http://127.0.0.1:${LOCAL_TEST_PORT}" ctl
   ctl=$(mktemp -u "${TMPDIR:-/tmp}/agent-test-XXXX")
   local -a S=(-o BatchMode=yes -o ConnectTimeout=15 -o IdentitiesOnly=yes -i "$key" -o StrictHostKeyChecking=accept-new -o LogLevel=ERROR)
@@ -436,35 +454,34 @@ cmd_test() {
   log "positive: tunnel + gateway"
   open_fwd "$ctl" -L "${P}:127.0.0.1:${API_PORT}" || die "could not open the agent tunnel"
   sleep 1
-  check "gw /healthz"                          200 "$(c "$B/healthz")"
-  check "gw /healthz/upstream (full hop)"      200 "$(c "$B/healthz/upstream")"
-  check "no bearer → 401"                      401 "$(c -X POST -H 'Content-Type: application/json' -d '{}' "$B/api/documents.list")"
-  check "GET → 405"                            405 "$(c -X GET -H 'Authorization: Bearer ol_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' "$B/api/documents.list")"
-  check "session-JWT shaped bearer → 401"      401 "$(c -X POST -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.e30.x' -H 'Content-Type: application/json' -d '{}' "$B/api/documents.list")"
-  check "non-JSON body → 415"                  415 "$(c -X POST -H 'Authorization: Bearer ol_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' -d '{}' "$B/api/documents.list")"
-  check "apiKeys.create not allowlisted → 403" 403 "$(c -X POST -H 'Authorization: Bearer ol_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' -H 'Content-Type: application/json' -d '{}' "$B/api/apiKeys.create")"
-  check "path traversal → 403"                 403 "$(c --path-as-is -X POST -H 'Authorization: Bearer ol_api_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' -H 'Content-Type: application/json' -d '{}' "$B/api/documents.info/../apiKeys.create")"
-  if [[ -n "$token" ]]; then
-    local me cid names doc did
-    me=$(curl -s --max-time 20 -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{}' "$B/api/auth.info")
-    check "auth.info name" "$IDENTITY" "$(jq -r '.data.user.name // "none" | if .=="Agent (service identity)" then "'"$IDENTITY"'" else . end' <<<"$me" 2>/dev/null || echo err)"
-    names=$(curl -s --max-time 20 -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{"limit":100}' "$B/api/collections.list" | jq -r '[.data[].name]|sort|join(",")')
-    check "collections.list → only ${COLLECTION}" "$COLLECTION" "$names"
-    cid=$(curl -s --max-time 20 -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg n "$COLLECTION" '{query:$n,limit:10}')" "$B/api/collections.list" | jq -r --arg n "$COLLECTION" '.data[]|select(.name==$n)|.id' | head -1)
-    doc=$(curl -s --max-time 25 -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg c "$cid" '{collectionId:$c,title:"agent e2e test",text:"written through the tunnel by agent/provision.sh test — safe to delete",publish:true}')" "$B/api/documents.create")
-    did=$(jq -r '.data.id // empty' <<<"$doc"); check "documents.create in ${COLLECTION}" ok "$([[ -n "$did" ]] && echo ok || echo "fail:$(jq -r '.message // .error // "?"' <<<"$doc")")"
-    if [[ -n "$did" ]]; then
-      check "documents.update"        200 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$did" '{id:$id,text:"appended",append:true}')" "$B/api/documents.update")"
-      check "documents.info"          200 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$did" '{id:$id}')" "$B/api/documents.info")"
-      check "documents.delete (trash)" 200 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$did" '{id:$id}')" "$B/api/documents.delete")"
-      admin_call documents.delete "$(jq -cn --arg id "$did" '{id:$id, permanent:true}')" >/dev/null 2>&1 || true   # purge if an admin token is present
-    fi
-    check "documents.move not allowlisted → 403"  403 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{}' "$B/api/documents.move")"
-    check "shares.create not allowlisted → 403"   403 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{}' "$B/api/shares.create")"
-    check "users.list not allowlisted → 403"      403 "$(c -X POST -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d '{}' "$B/api/users.list")"
-  else
-    warn "no --token given: skipping authenticated checks"
+  # The client sends NO Authorization header — the gateway injects the token.
+  local NOAUTH=(-X POST -H 'Content-Type: application/json' -d '{}')
+  check "gw /healthz"                            200 "$(c "$B/healthz")"
+  check "gw /healthz/upstream (full hop)"        200 "$(c "$B/healthz/upstream")"
+  check "no client credential → injected → 200"  200 "$(c "${NOAUTH[@]}" "$B/api/auth.info")"
+  check "client-sent bogus bearer is overwritten → 200" 200 "$(c -X POST -H 'Authorization: Bearer ol_api_deadbeefdeadbeefdeadbeefdeadbeefdead' -H 'Content-Type: application/json' -d '{}' "$B/api/auth.info")"
+  check "GET → 405"                              405 "$(c -X GET "$B/api/documents.list")"
+  check "non-JSON body → 415"                    415 "$(c -X POST -d '{}' "$B/api/documents.list")"
+  check "apiKeys.create not allowlisted → 403"   403 "$(c "${NOAUTH[@]}" "$B/api/apiKeys.create")"
+  check "path traversal → 403"                   403 "$(c --path-as-is "${NOAUTH[@]}" "$B/api/documents.info/../apiKeys.create")"
+  # authenticated behaviour (via the injected token; client still sends nothing)
+  local me names cid doc did
+  me=$(curl -s --max-time 20 "${NOAUTH[@]}" "$B/api/auth.info")
+  check "auth.info identity (injected)"          "$IDENTITY" "$(jq -r '.data.user.name' <<<"$me" 2>/dev/null | sed 's/Agent (service identity)/'"$IDENTITY"'/')"
+  names=$(curl -s --max-time 20 -X POST -H 'Content-Type: application/json' -d '{"limit":100}' "$B/api/collections.list" | jq -r '[.data[].name]|sort|join(",")')
+  check "collections.list → only ${COLLECTION}"  "$COLLECTION" "$names"
+  cid=$(curl -s --max-time 20 -X POST -H 'Content-Type: application/json' -d "$(jq -cn --arg n "$COLLECTION" '{query:$n,limit:10}')" "$B/api/collections.list" | jq -r --arg n "$COLLECTION" '.data[]|select(.name==$n)|.id' | head -1)
+  doc=$(curl -s --max-time 25 -X POST -H 'Content-Type: application/json' -d "$(jq -cn --arg c "$cid" '{collectionId:$c,title:"agent e2e test",text:"written through the tunnel by agent/provision.sh test — safe to delete",publish:true}')" "$B/api/documents.create")
+  did=$(jq -r '.data.id // empty' <<<"$doc"); check "documents.create in ${COLLECTION}" ok "$([[ -n "$did" ]] && echo ok || echo "fail:$(jq -r '.message // .error // "?"' <<<"$doc")")"
+  if [[ -n "$did" ]]; then
+    check "documents.update"          200 "$(c -X POST -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$did" '{id:$id,text:"appended",append:true}')" "$B/api/documents.update")"
+    check "documents.info"            200 "$(c -X POST -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$did" '{id:$id}')" "$B/api/documents.info")"
+    check "documents.delete (trash)"  200 "$(c -X POST -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$did" '{id:$id}')" "$B/api/documents.delete")"
+    admin_call documents.delete "$(jq -cn --arg id "$did" '{id:$id, permanent:true}')" >/dev/null 2>&1 || true   # purge if an admin token is present
   fi
+  check "documents.move not allowlisted → 403"   403 "$(c "${NOAUTH[@]}" "$B/api/documents.move")"
+  check "shares.create not allowlisted → 403"    403 "$(c "${NOAUTH[@]}" "$B/api/shares.create")"
+  check "users.list not allowlisted → 403"       403 "$(c "${NOAUTH[@]}" "$B/api/users.list")"
   close_fwd "$ctl"
 
   log "public-leak check (traefik-public must not expose the gateway)"
@@ -478,15 +495,21 @@ cmd_revoke() {
   local client=""; local all=0
   while (( $# )); do case "$1" in --client) client="$2"; shift 2 ;; --all) all=1; shift ;; *) die "unknown arg $1" ;; esac; done
   [[ -n "$client" || $all -eq 1 ]] || die "usage: revoke (--client <label> | --all)"
-  require_admin
   if (( all )); then
-    log "1/3 revoking every Outline token of ${IDENTITY}"; cmd_token revoke --all
-    log "2/3 stopping the gateway"; vps_ssh "cd ${VPS_REPO} && docker compose -p cloudnet stop agent-api-gw" && ok "agent-api-gw stopped"
+    require_admin
+    log "1/3 deleting every Outline key + blanking the gateway token"; cmd_token revoke
+    log "2/3 stopping the gateway"; vps_ssh "cd ${VPS_REPO} && docker compose -p cloudnet stop agent-api-gw" >/dev/null 2>&1 && ok "agent-api-gw stopped"
     log "3/3 removing all client keys + live sessions"; vps_ssh "sudo rm -f /etc/ssh/authorized_keys.d/${IDENTITY}; sudo pkill -u ${IDENTITY} || true" && ok "key file removed, sessions killed"
-    warn "repo still lists the keys — run ssh-key remove per client (and start the gateway again) when re-enabling"
+    warn "repo still lists the keys — run ssh-key remove per client (and re-issue the token + start the gateway) when re-enabling"
   else
-    log "revoking client=${client}"; cmd_token revoke --client "$client"; cmd_ssh_key remove --client "$client"
-    vps_ssh "sudo pkill -u ${IDENTITY} || true" >/dev/null 2>&1 || true; ok "live agent sessions dropped (other clients reconnect automatically)"
+    # Per-client: the authoritative cut-off is removing that client's SSH key (no
+    # key → no tunnel → no reach). The shared server-side token is unaffected, so
+    # other clients keep working. Rotate the token separately if this client's key
+    # may have leaked (`token issue`).
+    log "revoking client=${client} (removing its SSH key; live sessions dropped)"
+    cmd_ssh_key remove --client "$client"
+    vps_ssh "sudo pkill -u ${IDENTITY} || true" >/dev/null 2>&1 || true
+    ok "client ${client} can no longer connect; other clients unaffected. Rotate the token with 'token issue' if the key may have leaked."
   fi
 }
 

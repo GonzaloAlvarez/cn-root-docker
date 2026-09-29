@@ -473,7 +473,19 @@ services:
   # config-only → watchtower auto-updates allowed. No traefik.* labels — ever.
   agent-api-gw:
     image: nginxinc/nginx-unprivileged:1.29-alpine
-    command: ["nginx", "-c", "/etc/nginx/agent/nginx.conf", "-g", "daemon off;"]
+    # Render the server-side Outline token into a loopback-only include (tmpfs, so
+    # it never touches the read-only rootfs), THEN start nginx. The token is the
+    # gateway's, never the client's: agents authenticate by their SSH tunnel key
+    # and send no credential. An empty token yields a 401 from Outline (gateway
+    # effectively disabled) rather than a config error.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        printf 'proxy_set_header Authorization "Bearer %s";\n' "${AGENT_OUTLINE_TOKEN:-}" > /tmp/agent-token.conf
+        exec nginx -c /etc/nginx/agent/nginx.conf -g 'daemon off;'
+    environment:
+      - AGENT_OUTLINE_TOKEN=${AGENT_OUTLINE_TOKEN:-}
     networks:
       default:
         ipv4_address: 172.18.0.6
