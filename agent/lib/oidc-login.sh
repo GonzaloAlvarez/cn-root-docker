@@ -64,7 +64,10 @@ _ol_executor() {
 
 oidc_login() {
   local user="$1" pass="$2" jar hdr authz_url login_url next_q to authz2 flow_q callback token
-  jar=$(mktemp); trap 'rm -f "$jar"' RETURN
+  # NOTE: a RETURN trap is not function-local in bash, so it re-fires when a
+  # CALLER returns too; guard $jar (set -u) so that harmless second firing is a
+  # no-op instead of an "unbound variable" abort after the token is produced.
+  jar=$(mktemp); trap 'rm -f "${jar:-}"' RETURN
   # 1. Outline starts the OIDC dance and pins its `state` cookie.
   hdr=$(curl -sS --socks5-hostname "$PROXY" --max-time 60 -c "$jar" -D - -o /dev/null "${OUTLINE}/auth/oidc")
   authz_url=$(_ol_location <<<"$hdr"); [[ "$authz_url" == *"/application/o/authorize/"* ]] || { echo "oidc: unexpected redirect from /auth/oidc: ${authz_url:-<none>}" >&2; return 1; }

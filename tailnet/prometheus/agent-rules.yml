@@ -3,4 +3,12 @@
 # before the recorded expiry so the token can be rotated in time.
 groups:
   - name: agent-token-expiry
-    rules: []
+    rules:
+      - alert: AgentTokenExpiringSoon
+        expr: vector() - time() < 14 * 86400
+        labels:
+          severity: info
+          client: "claude-test"
+        annotations:
+          summary: "agent token for client 'claude-test' expires 2026-09-30"
+          description: "Token agent-claude-test-20260929 expires on 2026-09-30. Rotate: agent/provision.sh token issue --client claude-test, hand the new bundle to the client, then token revoke the old one."
