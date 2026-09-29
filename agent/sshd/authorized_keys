@@ -4,4 +4,3 @@
 # restrict,port-forwarding,permitopen="127.0.0.1:8093" options prefix into
 # /etc/ssh/authorized_keys.d/agent (root-owned) on the VPS.
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKonHwC5/aIaxO+BDsEgBiaOWvu1jbLaB1PzGgHsZnRw client=muse
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILdI1MXH3BONMwZOiRr43bFurn9bRAegon1YyAYuh5J5 client=verifyinject
