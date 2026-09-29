@@ -25,6 +25,36 @@ scrape_configs:
       - replacement: vps
         target_label: host
 
+    # agent-api-gw (agent/): counters derived from its JSON access log, scraped
+    # by Prometheus at 127.0.0.1:9080 (job promtail). No token ever appears in
+    # the log, so nothing here can leak one. max_idle_duration keeps the
+    # series alive across quiet days (default 5m would drop it).
+    pipeline_stages:
+      - match:
+          selector: '{service="agent-api-gw"}'
+          stages:
+            - json:
+                expressions:
+                  status: status
+            - template:
+                source: denied
+                template: '{{ if regexMatch "^[45]" .status }}1{{ else }}0{{ end }}'
+            - metrics:
+                agent_gw_requests_total:
+                  type: Counter
+                  description: "agent-api-gw requests, all statuses"
+                  max_idle_duration: 24h
+                  config:
+                    match_all: true
+                    action: inc
+                agent_gw_denied_total:
+                  type: Counter
+                  description: "agent-api-gw 4xx/5xx responses"
+                  max_idle_duration: 24h
+                  source: denied
+                  config:
+                    action: add
+
   - job_name: host-journal
     journal:
       max_age: 12h
@@ -37,3 +67,32 @@ scrape_configs:
         target_label: unit
       - source_labels: ['__journal__hostname']
         target_label: hostname
+    # sshd events for the forwarding-only `agent` account (agent/sshd/).
+    # OpenSSH 9.2 logs NOTHING when PermitOpen refuses a forward or MaxSessions 0
+    # refuses a session (verified on a Debian 12 VM), so there is no
+    # "forward denied" counter — misuse that reaches the gateway shows up in
+    # agent_gw_denied_total instead. The "not in PubkeyAcceptedAlgorithms" line
+    # carries no username but only the agent Match restricts algorithms.
+    pipeline_stages:
+      - match:
+          selector: '{unit="ssh.service"}'
+          stages:
+            - regex:
+                expression: '(?P<agent_ssh_accepted>Accepted publickey for agent from)'
+            - regex:
+                expression: '(?P<agent_ssh_failed>Failed publickey for agent from|not in PubkeyAcceptedAlgorithms)'
+            - metrics:
+                agent_ssh_accepted_total:
+                  type: Counter
+                  description: "agent publickey logins accepted"
+                  max_idle_duration: 24h
+                  source: agent_ssh_accepted
+                  config:
+                    action: inc
+                agent_ssh_failed_total:
+                  type: Counter
+                  description: "agent publickey logins rejected (wrong key or non-ed25519)"
+                  max_idle_duration: 24h
+                  source: agent_ssh_failed
+                  config:
+                    action: inc

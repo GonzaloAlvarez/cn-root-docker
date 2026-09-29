@@ -253,6 +253,7 @@ services:
     volumes:
       - "./tailnet/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
       - "./tailnet/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro"
+      - "./tailnet/prometheus/agent-rules.yml:/etc/prometheus/agent-rules.yml:ro"
       - "prometheus_data:/prometheus"
     depends_on:
       - ts-infra
@@ -455,6 +456,42 @@ services:
       - NOTIFICATION_LEVEL=info
     volumes:
       - ./state/sms/backups:/backup/sms-backups:ro
+    depends_on:
+      - ts-infra
+    restart: unless-stopped
+
+  # agent-api-gw: forwarding-only, allowlisting API gateway for EXTERNAL AGENTS
+  # (agent/README.md). Agents reach it only through sshd's `Match User agent`
+  # block (PermitOpen 127.0.0.1:8093) → this loopback publish; nothing is on the
+  # public surface. Bridge-side (NOT ts-infra's netns) so the host sshd can
+  # reach it; it dials traefik-lab at https://ts-infra:443 over the bridge with
+  # full LE verification (nginx re-resolves the name every 30s, so it survives
+  # ts-infra recreates and is deliberately absent from ts-infra-watchdog DEPS).
+  # Bridge IP pinned because prometheus/blackbox live in ts-infra's netns where
+  # docker names don't resolve (same reason headscale is pinned at .5).
+  # Backend today: Outline (agent/gateway/backend-outline*.conf). Stateless +
+  # config-only → watchtower auto-updates allowed. No traefik.* labels — ever.
+  agent-api-gw:
+    image: nginxinc/nginx-unprivileged:1.29-alpine
+    command: ["nginx", "-c", "/etc/nginx/agent/nginx.conf", "-g", "daemon off;"]
+    networks:
+      default:
+        ipv4_address: 172.18.0.6
+    ports:
+      - "127.0.0.1:8093:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./agent/gateway:/etc/nginx/agent:ro   # directory mount: edits survive git pull
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
     depends_on:
       - ts-infra
     restart: unless-stopped

@@ -1,0 +1,5 @@
+# Public keys of registered agent clients — PUBLIC material, safe to commit.
+# One key per line: `ssh-ed25519 AAAA... client=<label>`. Managed by
+# `agent/provision.sh ssh-key add|remove`; install.sh renders each line with the
+# restrict,port-forwarding,permitopen="127.0.0.1:8093" options prefix into
+# /etc/ssh/authorized_keys.d/agent (root-owned) on the VPS.

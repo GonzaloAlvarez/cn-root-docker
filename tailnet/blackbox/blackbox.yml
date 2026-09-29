@@ -15,3 +15,17 @@ modules:
       fail_if_not_ssl: true
       tls_config:
         insecure_skip_verify: false
+
+  # Plain-HTTP liveness on the docker bridge (agent-api-gw /healthz*): only a
+  # 200 counts, TLS must NOT be present.
+  http_2xx_plain:
+    prober: http
+    timeout: 10s
+    http:
+      preferred_ip_protocol: ip4
+      valid_http_versions: [HTTP/1.1, HTTP/2.0]
+      valid_status_codes: [200]
+      method: GET
+      follow_redirects: false
+      fail_if_ssl: true
+      fail_if_not_ssl: false

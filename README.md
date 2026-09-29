@@ -17,6 +17,7 @@ Docker Compose stack for the VPS control plane. Runs on an EC2 instance provisio
 | `sms-archive` | SMS archive ([cn-sms-service](https://github.com/GonzaloAlvarez/cn-sms-service), built from sibling clone `/opt/cn-sms-service`) — SMSGate webhooks at `smsgw.<LAB_DOMAIN>`, read-only UI at `sms.<LAB_DOMAIN>` behind Authentik forward-auth |
 | `sms-backup` | Nightly online SQLite backup of the SMS archive (7 generations, `state/sms/backups`) |
 | `sms-offsite` | Weekly offen tarball of the SMS backups → S3 + raidnas WebDAV |
+| `agent-api-gw` | Forwarding-only API gateway for external agents (`agent/`): reachable only via the `agent` sshd pinhole → `127.0.0.1:8093`; allowlists Outline read/write methods for the private `Memories` collection |
 
 ## Configuration
 
