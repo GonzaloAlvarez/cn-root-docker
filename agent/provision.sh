@@ -56,20 +56,22 @@ die()  { printf '\033[1;31m[FAIL]\033[0m %s\n' "$*" >&2; exit 1; }
 need() { for c in "$@"; do command -v "$c" >/dev/null || die "missing tool: $c"; done; }
 need curl jq ssh ssh-keygen ssh-keyscan nc git openssl
 
-HTTP=""
+HTTP_FILE=$(mktemp); trap 'rm -f "$HTTP_FILE"' EXIT
+HTTP() { cat "$HTTP_FILE" 2>/dev/null; }      # last HTTP status of outline_call / ak_call (survives $(…) subshells)
 pcurl() { curl -sS --socks5-hostname "$PROXY" --max-time 60 "$@"; }
-# outline_call <bearer> <method> <json> → prints body, sets HTTP
+# outline_call <bearer> <method> <json> → prints body; status via $(HTTP)
 outline_call() {
   local out
-  out=$(pcurl -w $'\n%{http_code}' -X POST -H "Authorization: Bearer $1" -H 'Content-Type: application/json' \
-        --data "${3:-{\}}" "${OUTLINE}/api/$2") || { HTTP=000; return 1; }
-  HTTP=${out##*$'\n'}; printf '%s' "${out%$'\n'*}"
+  local body="${3:-"{}"}"
+  out=$(pcurl -w '\n%{http_code}' -X POST -H "Authorization: Bearer $1" -H 'Content-Type: application/json' \
+        --data "$body" "${OUTLINE}/api/$2") || { printf 000 >"$HTTP_FILE"; return 1; }
+  tail -n1 <<<"$out" >"$HTTP_FILE"; sed '$d' <<<"$out"
 }
 ADMIN_TOKEN="${OUTLINE_ADMIN_TOKEN:-}"
 require_admin() {
   [[ -n "$ADMIN_TOKEN" ]] || die "OUTLINE_ADMIN_TOKEN not set (or --admin-token-file). Mint one in Outline → Settings → API & Apps (scope: users.* collections.* apiKeys.* auth.info, short expiry)."
   local me; me=$(outline_call "$ADMIN_TOKEN" auth.info) || true
-  [[ "$HTTP" == 200 ]] || die "admin token rejected by Outline (HTTP ${HTTP}): $(head -c 200 <<<"$me")"
+  [[ "$(HTTP)" == 200 ]] || die "admin token rejected by Outline (HTTP ${HTTP}): $(head -c 200 <<<"$me")"
   [[ "$(jq -r '.data.user.role' <<<"$me")" == admin ]] || die "OUTLINE_ADMIN_TOKEN belongs to a non-admin user"
   ok "admin token valid (user $(jq -r '.data.user.name' <<<"$me"))"
 }
@@ -82,21 +84,21 @@ neptune_ssh() {  # trusted LAN path over the proxy (homelab CLAUDE.md §4.2 conv
 }
 vps_ssh() { ssh "${SSH_COMMON[@]}" -l "$VPS_USER" "$VPS" "$@"; }
 
-# ak_call <METHOD> <path> [json] → prints body, sets HTTP. Runs ON neptune with the
+# ak_call <METHOD> <path> [json] → prints body; status via $(HTTP). Runs ON neptune with the
 # bootstrap token from ~/cn-authentik/.env (the token never leaves neptune).
 ak_call() {
   local method="$1" path="$2" body="${3:-}" dflag="" out
   [[ -n "$body" ]] && dflag="-d @-"
-  out=$(printf '%s' "$body" | neptune_ssh "cd ~/cn-authentik && T=\$(grep -E '^AUTHENTIK_BOOTSTRAP_TOKEN=' .env | cut -d= -f2-) && curl -sS -k --max-time 60 -w '\n%{http_code}' -H \"Authorization: Bearer \$T\" -H 'Content-Type: application/json' -H 'Accept: application/json' -X '$method' 'http://127.0.0.1:9000/api/v3$path' $dflag") || { HTTP=000; return 1; }
-  HTTP=${out##*$'\n'}; printf '%s' "${out%$'\n'*}"
+  out=$(printf '%s' "$body" | neptune_ssh "cd ~/cn-authentik && T=\$(grep -E '^AUTHENTIK_BOOTSTRAP_TOKEN=' .env | cut -d= -f2-) && curl -sS -k --max-time 60 -w '\n%{http_code}' -H \"Authorization: Bearer \$T\" -H 'Content-Type: application/json' -H 'Accept: application/json' -X '$method' 'http://127.0.0.1:9000/api/v3$path' $dflag") || { printf 000 >"$HTTP_FILE"; return 1; }
+  tail -n1 <<<"$out" >"$HTTP_FILE"; sed '$d' <<<"$out"
 }
 ak_user_pk() { ak_call GET "/core/users/?username=${IDENTITY}&page_size=50" | jq -r --arg u "$IDENTITY" '[.results[] | select(.username==$u)] | first | .pk // empty'; }
 ak_set_active() {  # <pk> <true|false>
-  ak_call PATCH "/core/users/$1/" "{\"is_active\": $2}" >/dev/null; [[ "$HTTP" == 200 ]] || die "Authentik: could not set is_active=$2 (HTTP $HTTP)"
+  ak_call PATCH "/core/users/$1/" "{\"is_active\": $2}" >/dev/null; [[ "$(HTTP)" == 200 ]] || die "Authentik: could not set is_active=$2 (HTTP $(HTTP))"
 }
 ak_set_password() {  # <pk> <password>
   jq -cn --arg p "$2" '{password:$p}' | { read -r j; ak_call POST "/core/users/$1/set_password/" "$j" >/dev/null; }
-  [[ "$HTTP" == 204 ]] || die "Authentik: set_password failed (HTTP $HTTP)"
+  [[ "$(HTTP)" == 204 ]] || die "Authentik: set_password failed (HTTP $(HTTP))"
 }
 gen_pw() { openssl rand -base64 30 | tr -d '\n=/+' | head -c 32; }
 iso_plus_days() { date -u -v+"$1"d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "+$1 days" +%Y-%m-%dT%H:%M:%SZ; }
@@ -250,9 +252,9 @@ ol_user() {  # → json of the agent Outline user (by email), via admin
 }
 ol_set_role() {  # <userId> <role>
   admin_call users.update_role "$(jq -cn --arg id "$1" --arg r "$2" '{id:$id,role:$r}')" >/dev/null
-  if [[ "$HTTP" != 200 ]]; then
+  if [[ "$(HTTP)" != 200 ]]; then
     admin_call users.demote "$(jq -cn --arg id "$1" --arg r "$2" '{id:$id,to:$r}')" >/dev/null
-    [[ "$HTTP" == 200 ]] || die "could not set role ${2} (users.update_role and users.demote both failed, HTTP $HTTP)"
+    [[ "$(HTTP)" == 200 ]] || die "could not set role ${2} (users.update_role and users.demote both failed, HTTP $(HTTP))"
   fi
 }
 authentik_login_session() {  # → JWT ; (re)activates the Authentik user with a fresh throwaway password
@@ -272,21 +274,21 @@ cmd_identity() {
   log "2/6 Outline login as ${IDENTITY} (headless OIDC via Authentik flow executor)"
   local jwt me uid
   jwt=$(oidc_login "$IDENTITY" "$pw") || die "headless OIDC login failed — see agent/README.md 'magic-link fallback'"
-  me=$(outline_call "$jwt" auth.info); [[ "$HTTP" == 200 ]] || die "auth.info with the session failed (HTTP $HTTP)"
+  me=$(outline_call "$jwt" auth.info); [[ "$(HTTP)" == 200 ]] || die "auth.info with the session failed (HTTP $(HTTP))"
   uid=$(jq -r .data.user.id <<<"$me"); ok "Outline user $(jq -r .data.user.name <<<"$me") (${uid}, role $(jq -r .data.user.role <<<"$me"))"
   log "3/6 collection ${COLLECTION} (private, no public sharing)"
   local cid; cid=$(ol_collection_id "$COLLECTION")
   if [[ -z "$cid" ]]; then
     cid=$(admin_call collections.create "$(jq -cn --arg n "$COLLECTION" '{name:$n, permission:null, sharing:false, description:"Memory store for external agents (agent/ pinhole). Private: explicit membership only."}')" | jq -r '.data.id // empty')
-    [[ "$HTTP" == 200 && -n "$cid" ]] || die "collections.create failed (HTTP $HTTP)"; chg "created ${COLLECTION} (${cid})"
+    [[ "$(HTTP)" == 200 && -n "$cid" ]] || die "collections.create failed (HTTP $(HTTP))"; chg "created ${COLLECTION} (${cid})"
   else ok "exists (${cid})"; fi
   local cinfo; cinfo=$(admin_call collections.info "$(jq -cn --arg id "$cid" '{id:$id}')")
   if [[ "$(jq -r '.data.permission' <<<"$cinfo")" != null || "$(jq -r '.data.sharing' <<<"$cinfo")" != false ]]; then
-    admin_call collections.update "$(jq -cn --arg id "$cid" '{id:$id, permission:null, sharing:false}')" >/dev/null; [[ "$HTTP" == 200 ]] || die "collections.update failed (HTTP $HTTP)"
+    admin_call collections.update "$(jq -cn --arg id "$cid" '{id:$id, permission:null, sharing:false}')" >/dev/null; [[ "$(HTTP)" == 200 ]] || die "collections.update failed (HTTP $(HTTP))"
     chg "default access → none, sharing → off"
   else ok "default access none, sharing off"; fi
   admin_call collections.add_user "$(jq -cn --arg id "$cid" --arg u "$uid" '{id:$id, userId:$u, permission:"read_write"}')" >/dev/null
-  [[ "$HTTP" == 200 ]] || die "collections.add_user failed (HTTP $HTTP)"; ok "${IDENTITY} is read_write member of ${COLLECTION}"
+  [[ "$(HTTP)" == 200 ]] || die "collections.add_user failed (HTTP $(HTTP))"; ok "${IDENTITY} is read_write member of ${COLLECTION}"
   log "4/6 role → guest"
   ol_set_role "$uid" guest; ok "role guest"
   log "5/6 verification as ${IDENTITY}"
@@ -294,13 +296,13 @@ cmd_identity() {
   [[ "$names" == "$COLLECTION" ]] && ok "collections.list → only ${COLLECTION}" || die "collections.list returned: '${names}' (expected only ${COLLECTION}). Make the others private or fix the role."
   local doc did
   doc=$(outline_call "$jwt" documents.create "$(jq -cn --arg c "$cid" '{collectionId:$c, title:"agent provisioning smoke test", text:"created by agent/provision.sh identity ensure — safe to delete", publish:true}')")
-  [[ "$HTTP" == 200 ]] && ok "documents.create in ${COLLECTION} → 200 (guest + read_write can write)" || die "documents.create in ${COLLECTION} failed (HTTP $HTTP): $(head -c 200 <<<"$doc") — Guest may not be allowed to write; see README fallback"
+  [[ "$(HTTP)" == 200 ]] && ok "documents.create in ${COLLECTION} → 200 (guest + read_write can write)" || die "documents.create in ${COLLECTION} failed (HTTP $(HTTP)): $(head -c 200 <<<"$doc") — Guest may not be allowed to write; see README fallback"
   did=$(jq -r .data.id <<<"$doc")
-  outline_call "$jwt" documents.delete "$(jq -cn --arg id "$did" '{id:$id, permanent:true}')" >/dev/null; [[ "$HTTP" == 200 ]] && ok "smoke document deleted" || warn "could not delete smoke document ${did} (HTTP $HTTP) — delete by hand"
+  outline_call "$jwt" documents.delete "$(jq -cn --arg id "$did" '{id:$id, permanent:true}')" >/dev/null; [[ "$(HTTP)" == 200 ]] && ok "smoke document deleted" || warn "could not delete smoke document ${did} (HTTP $(HTTP)) — delete by hand"
   local other; other=$(admin_call collections.list '{"limit":100}' | jq -r --arg n "$COLLECTION" '[.data[] | select(.name!=$n)][0].id // empty')
   if [[ -n "$other" ]]; then
     outline_call "$jwt" documents.list "$(jq -cn --arg c "$other" '{collectionId:$c}')" >/dev/null
-    [[ "$HTTP" == 403 ]] && ok "documents.list on another collection → 403" || die "expected 403 on another collection, got HTTP $HTTP"
+    [[ "$(HTTP)" == 403 ]] && ok "documents.list on another collection → 403" || die "expected 403 on another collection, got HTTP $(HTTP)"
   fi
   log "6/6 deactivate Authentik user"
   authentik_deactivate
@@ -324,16 +326,16 @@ cmd_token() {
       payload=$(jq -cn --arg n "$name" --arg e "$exp" --argjson s "$(printf '%s\n' "${SCOPES[@]}" | jq -R . | jq -sc .)" '{name:$n, expiresAt:$e, scope:$s}')
       log "apiKeys.create ${name} (expires ${exp})"
       resp=$(outline_call "$jwt" apiKeys.create "$payload")
-      if [[ "$HTTP" != 200 ]]; then
-        warn "apiKeys.create refused as ${role} (HTTP $HTTP) — temporarily promoting to member"
+      if [[ "$(HTTP)" != 200 ]]; then
+        warn "apiKeys.create refused as ${role} (HTTP $(HTTP)) — temporarily promoting to member"
         ol_set_role "$uid" member
         resp=$(outline_call "$jwt" apiKeys.create "$payload")
         ol_set_role "$uid" guest; ok "role restored to guest"
-        [[ "$HTTP" == 200 ]] || die "apiKeys.create still failing (HTTP $HTTP): $(head -c 300 <<<"$resp")"
+        [[ "$(HTTP)" == 200 ]] || die "apiKeys.create still failing (HTTP $(HTTP)): $(head -c 300 <<<"$resp")"
       fi
       secret=$(jq -r '.data.secret // .data.value // empty' <<<"$resp"); [[ -n "$secret" ]] || die "no secret in apiKeys.create response: $(head -c 300 <<<"$resp")"
       log "verifying the new token"
-      me=$(outline_call "$secret" auth.info); [[ "$HTTP" == 200 && "$(jq -r .data.user.role <<<"$me")" == guest ]] && ok "token works, role guest" || die "token verification failed (HTTP $HTTP, role $(jq -r '.data.user.role // "?"' <<<"$me"))"
+      me=$(outline_call "$secret" auth.info); [[ "$(HTTP)" == 200 && "$(jq -r .data.user.role <<<"$me")" == guest ]] && ok "token works, role guest" || die "token verification failed (HTTP $(HTTP), role $(jq -r '.data.user.role // "?"' <<<"$me"))"
       authentik_deactivate
       local cid; cid=$(ol_collection_id "$COLLECTION")
       ledger_set "$client" - "$name" "$(today)" "${exp%%T*}"
@@ -351,7 +353,7 @@ cmd_token() {
         "") die "usage: token revoke (<id> | --client <label> | --all)" ;;
         *) ids="$sel" ;;
       esac
-      for id in $ids; do admin_call apiKeys.delete "$(jq -cn --arg id "$id" '{id:$id}')" >/dev/null; [[ "$HTTP" == 200 ]] && chg "revoked ${id}" || warn "delete ${id} → HTTP $HTTP"; done
+      for id in $ids; do admin_call apiKeys.delete "$(jq -cn --arg id "$id" '{id:$id}')" >/dev/null; [[ "$(HTTP)" == 200 ]] && chg "revoked ${id}" || warn "delete ${id} → HTTP $(HTTP)"; done
       [[ "$sel" == --all ]] && { while read -r c; do [[ -n "$c" ]] && ledger_set "$c" - "" "" ""; done < <(grep -E '^\| ' "$LEDGER" | awk -F'|' 'NR>2{print $2}' | xargs -n1 2>/dev/null || true); }
       git_commit_push "agent: token(s) revoked ${sel} ${2:-}" ;;
     *) die "usage: token issue|list|revoke" ;;
