@@ -134,8 +134,16 @@ curl -sS -X POST http://127.0.0.1:8093/api/documents.search \
 its Outline token(s), remove its key line (commit, push, reinstall on the VPS),
 drop live `agent` sessions. **Revoke everything:** `provision.sh revoke --all`
 (tokens → `docker compose -p cloudnet stop agent-api-gw` → `rm
-/etc/ssh/authorized_keys.d/agent && pkill -u agent`). Without the script:
-`ssh hs.gn.al 'sudo rm -f /etc/ssh/authorized_keys.d/agent; sudo pkill -u agent'`.
+/etc/ssh/authorized_keys.d/agent && pkill -u agent`). The fastest kill needs no
+script and no Outline call — **remove the ssh key and the client can no longer
+reach the gateway at all**: `ssh hs.gn.al 'sudo rm -f
+/etc/ssh/authorized_keys.d/agent; sudo pkill -u agent'`.
+
+> Note: Outline's `apiKeys.delete` is **self-only** — an admin token cannot
+> delete another user's key. `token revoke` therefore opens a short-lived agent
+> session (reactivate → OIDC login → delete own keys → deactivate) to remove the
+> token. The ssh-key removal above is the authoritative cut-off regardless; the
+> token is defense-in-depth (and every token also carries a 90-day hard expiry).
 
 **Rotate:** client key → `ssh-key add` the new one, client switches, `ssh-key
 remove` the old. Token → `token issue` (the `AgentTokenExpiringSoon` alert fires
