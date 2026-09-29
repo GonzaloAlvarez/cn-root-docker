@@ -603,6 +603,6 @@ case "${1:-}" in
   bundle)    cmd_bundle "$@" ;;
   test)      shift; cmd_test "$@" ;;
   revoke)    shift; cmd_revoke "$@" ;;
-  -h|--help|"") sed -n '2,26p' "$0" ;;
+  -h|--help|"") sed -n '2,26p' "$HERE/provision.sh" ;;   # $0 may be relative and we cd'ed into $HERE
   *) die "unknown command: $1" ;;
 esac

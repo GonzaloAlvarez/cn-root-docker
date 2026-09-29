@@ -45,8 +45,8 @@ scope = the same allowlist + 90-day expiry; (5) explicit `Memories`-only members
 | `sshd/50-agent.conf` | the `Match User agent` block |
 | `sshd/authorized_keys` | registered client public keys (`ssh-ed25519 … client=<label>`) — public material |
 | `sshd/install.sh` / `uninstall.sh` | root-level installer on the VPS with operator-lockout guards + auto-revert timer |
-| `clients.md` | ledger: SSH clients (fingerprints) + the active injected token (name/dates) — never secret values |
-| `../tailnet/prometheus/agent-rules.yml` | generated `AgentTokenExpiringSoon` rule for the injected token |
+| `clients.md` | ledger: SSH clients (fingerprints), the active injected token (name/dates) and `local-<label>` rows for per-machine skill keys — never secret values |
+| `../tailnet/prometheus/agent-rules.yml` | generated `AgentTokenExpiringSoon` rules — one per token row (gateway + each local key), with the matching rotation instruction |
 
 The token itself lives only in the VPS `/opt/cloudnet/.env` as `AGENT_OUTLINE_TOKEN`;
 the container command renders it into `/tmp/agent-token.conf` (tmpfs) at start and
@@ -80,9 +80,11 @@ agent/provision.sh token issue                                # mint the Outline
 agent/provision.sh ssh-key add ./client.pub --client <label>  # commit+push, install on the VPS, verify a NEW operator login, print host key
 agent/provision.sh bundle --client <label>                    # the client bundle (host key + tunnel cmd + URL) — NO token
 agent/provision.sh test --client <label> --key ./client_key   # full matrix from the Mac (client sends no credential)
-agent/provision.sh token list | token revoke                  # list keys / delete all keys + blank the gateway
+agent/provision.sh token list | token revoke                  # list keys / delete ALL keys (incl. local) + blank the gateway
 agent/provision.sh ssh-key remove --client <label>
 agent/provision.sh revoke --client <label> | --all
+agent/provision.sh token issue --local <label> --write ~/.outline-token   # per-machine key for the outlinememory skill (no admin token)
+agent/provision.sh token revoke --local <label>               # delete one machine's local keys only
 ```
 
 **Hand-off:** the client sends its `ssh-ed25519` **public** key → you `ssh-key add`
@@ -137,6 +139,33 @@ curl -sS -X POST http://127.0.0.1:8093/api/documents.search \
   https://outline.lab.gn.al/auth/email -d 'email=gonzaloab+agent@gmail.com'`, open
   the emailed link with the same cookie jar, read `accessToken`, continue by hand.
 
+## Local per-machine keys (outlinememory skill)
+
+The operator's own Claude Code / Codex sessions write memories into the same `Memories`
+collection through the **`outlinememory` skill** (`~/dev/skill-outlinememory`, public repo
+`GonzaloAlvarez/skill-outlinememory` — it contains no instance data; the Outline URL lives
+in `~/.outline-memory.yml` on each machine). Those machines talk to Outline directly (tailnet)
+or through the SOCKS proxy, never through the gateway, so each one needs its own key:
+
+- `provision.sh token issue --local <label> [--expires-days 365] [--write ~/.outline-token]`
+  mints `agent-local-<label>-<ts>` on the same `agent` user with the minimal
+  `LOCAL_SCOPES` (`auth.info collections.list collections.documents documents.create
+  documents.info` — read the tree, add pages; no update/delete). Label = lowercase
+  `hostname -s`. No admin token is needed (self-service inside the agent's OIDC session,
+  which is reactivated and deactivated like for the gateway key). The secret is printed
+  once or written 0600 to `--write`; it is never stored in git or the ledger.
+- Re-issuing with the same label rotates (new key, then the old `agent-local-<label>-*`
+  are deleted). `token revoke --local <label>` deletes one machine's keys and drops its
+  ledger row; plain `token revoke` deletes everything, local keys included, and says so.
+- Gateway rotation (`token issue`) filters by the `agent-injected-` prefix, so local keys
+  survive it. The ledger gets a `local-<label>` row (token name, issued, expires) and
+  `agent-rules.yml` a matching `AgentTokenExpiringSoon` rule whose description names the
+  machine and the local rotation command (deploy: VPS `git pull` + `docker compose up -d
+  --force-recreate --no-deps prometheus`).
+- Pages land at `Memories › dev › <project> › YYYY-MM-DD <topic>` (containers created
+  empty, like muse's `personal / travel / …` tree) and are authored by `agent`; muse can
+  browse them because `collections.documents` is on the gateway allowlist.
+
 ## Runbooks
 
 **Revoke one client (< 1 min):** `provision.sh revoke --client <label>` removes that
@@ -154,6 +183,10 @@ the gateway token + stop `agent-api-gw` + remove the key file + kill sessions.
   are unaffected — they hold no token. The `AgentTokenExpiringSoon` alert fires 14 days
   before the 90-day expiry.
 - *Client SSH key:* `ssh-key add` the new one, client switches, `ssh-key remove` the old.
+- *Local skill key (one machine):* on that machine, `provision.sh token issue --local <label>
+  --write ~/.outline-token` mints the new key and deletes the previous `agent-local-<label>-*`.
+  Its own `AgentTokenExpiringSoon` rule (label `local-<label>`) fires 14 days before the
+  1-year expiry. Gateway `token issue` never touches these keys.
 - *VPS host key* (only on a rebuild): new `known_hosts` line to every client first.
 
 > Note: Outline's `apiKeys.delete` is **self-only** — an admin token cannot delete
