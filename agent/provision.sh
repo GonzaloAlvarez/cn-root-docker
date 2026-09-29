@@ -231,7 +231,7 @@ cmd_ssh_key() {
       done <"$KEYS_FILE"
       (( removed )) || { rm -f "$tmp"; die "no matching key"; }
       mv "$tmp" "$KEYS_FILE"
-      [[ -n "$client" ]] && ledger_set "$client" "" - - -
+      [[ -n "$client" ]] && ledger_remove "$client"
       git_commit_push "agent: remove ssh key ${client:+client=$client}${sel}"
       (( deploy )) && deploy_keys ;;
     *) die "usage: ssh-key add|remove|list" ;;
@@ -356,17 +356,27 @@ cmd_token() {
       require_admin; local u; u=$(ol_user); [[ -n "$u" ]] || die "Outline user ${IDENTITY} not found"
       admin_call apiKeys.list "$(jq -cn --arg u "$(jq -r .id <<<"$u")" '{userId:$u, limit:100}')" | jq -r '.data[] | [.id, .name, (.expiresAt // "never"), (.lastActiveAt // "unused")] | @tsv' | column -t ;;
     revoke)
-      require_admin; local u ids sel="${1:-}"; u=$(ol_user); [[ -n "$u" ]] || die "Outline user ${IDENTITY} not found"
-      local all; all=$(admin_call apiKeys.list "$(jq -cn --arg u "$(jq -r .id <<<"$u")" '{userId:$u, limit:100}')")
+      # apiKeys.delete is SELF-ONLY in Outline (an admin cannot delete another
+      # user's key), so revoke logs in AS the agent and deletes its own keys.
+      local sel="${1:-}" lbl="${2:-}"
+      [[ -n "$sel" ]] || die "usage: token revoke (<id> | --client <label> | --all)"
+      local jwt; jwt=$(authentik_login_session) || die "could not open an agent session to delete keys"
+      local all; all=$(outline_call "$jwt" apiKeys.list '{"limit":100}')
+      local ids
       case "$sel" in
-        --all) ids=$(jq -r '.data[].id' <<<"$all") ;;
-        --client) ids=$(jq -r --arg p "agent-${2:-}-" '.data[] | select(.name|startswith($p)) | .id' <<<"$all"); ledger_set "${2:-}" - "" "" "" ;;
-        "") die "usage: token revoke (<id> | --client <label> | --all)" ;;
-        *) ids="$sel" ;;
+        --all)    ids=$(jq -r '.data[].id' <<<"$all") ;;
+        --client) ids=$(jq -r --arg p "agent-${lbl}-" '.data[] | select(.name|startswith($p)) | .id' <<<"$all") ;;
+        *)        ids="$sel" ;;
       esac
-      for id in $ids; do admin_call apiKeys.delete "$(jq -cn --arg id "$id" '{id:$id}')" >/dev/null; [[ "$(HTTP)" == 200 ]] && chg "revoked ${id}" || warn "delete ${id} → HTTP $(HTTP)"; done
-      [[ "$sel" == --all ]] && { while read -r c; do [[ -n "$c" ]] && ledger_set "$c" - "" "" ""; done < <(grep -E '^\| ' "$LEDGER" | awk -F'|' 'NR>2{print $2}' | xargs -n1 2>/dev/null || true); }
-      git_commit_push "agent: token(s) revoked ${sel} ${2:-}" ;;
+      if [[ -z "$ids" ]]; then ok "no matching keys to revoke"; else
+        for id in $ids; do outline_call "$jwt" apiKeys.delete "$(jq -cn --arg id "$id" '{id:$id}')" >/dev/null; [[ "$(HTTP)" == 200 ]] && chg "revoked ${id}" || warn "delete ${id} → HTTP $(HTTP)"; done
+      fi
+      authentik_deactivate
+      case "$sel" in
+        --client) ledger_set "$lbl" - "" "" "" ;;
+        --all)    while read -r c; do [[ -n "$c" && "$c" != client ]] && ! [[ "$c" =~ ^-+$ ]] && ledger_set "$c" - "" "" ""; done < <(awk -F'|' '/^\| /{print $2}' "$LEDGER" | xargs -n1 2>/dev/null || true) ;;
+      esac
+      git_commit_push "agent: token(s) revoked ${sel} ${lbl}" ;;
     *) die "usage: token issue|list|revoke" ;;
   esac
 }

@@ -4,4 +4,3 @@ Maintained by `agent/provision.sh`. One row per client. Token values are never s
 
 | client | ssh key fingerprint | token name | token issued | token expires |
 |---|---|---|---|---|
-| claude-test |  |  |  |  |
