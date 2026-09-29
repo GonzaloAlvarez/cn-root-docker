@@ -3,4 +3,3 @@
 # `agent/provision.sh ssh-key add|remove`; install.sh renders each line with the
 # restrict,port-forwarding,permitopen="127.0.0.1:8093" options prefix into
 # /etc/ssh/authorized_keys.d/agent (root-owned) on the VPS.
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDKwl1NlZcCHfZgsNDBW4tNakhsJu+UE+BbTMVMy75oE client=claude-test
