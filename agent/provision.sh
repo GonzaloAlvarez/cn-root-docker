@@ -509,7 +509,11 @@ Smoke test   : curl -sS -X POST http://127.0.0.1:${API_PORT}/api/auth.info \\
                  -H 'Content-Type: application/json' -d '{}'
 B
 }
-cmd_bundle() { print_bundle "${2:-<client>}"; }
+cmd_bundle() {  # [--client <label>]
+  local client="<client>"; shift || true
+  while (( $# )); do case "$1" in --client) client="$2"; shift 2 ;; *) die "usage: bundle [--client <label>]" ;; esac; done
+  print_bundle "$client"
+}
 
 # ── end-to-end test from the Mac acting as a client ─────────────────────────
 cmd_test() {
