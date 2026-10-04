@@ -155,7 +155,7 @@ groups:
           severity: critical
         annotations:
           summary: "{{ $labels.instance }} ingress probe failing"
-          description: "blackbox-tailnet-http got a status outside valid_status_codes (or no response) for >5m on {{ $labels.instance }} — the VPS traefik-lab → backend path is failing or returning an unexpected code. The backend depends on the host in the URL: fitness.lab.gn.al → kaiser cn-fitness; *.fxa.lab.gn.al → neptune cn-mzfxa; sync.lab.gn.al → neptune cn-mzsync. SSH the owning host and check that stack's `docker compose ps` + logs, plus the VPS traefik-lab route."
+          description: "blackbox-tailnet-http got a status outside valid_status_codes (or no response) for >5m on {{ $labels.instance }} — the VPS traefik-lab → backend path is failing or returning an unexpected code. The backend depends on the host in the URL: fitness.lab.gn.al → kaiser cn-fitness; *.fxa.lab.gn.al → neptune cn-mzfxa; sync.lab.gn.al → neptune cn-mzsync; nvr.lab.gn.al → cerberus cn-nvr. SSH the owning host and check that stack's `docker compose ps` + logs, plus the VPS traefik-lab route."
 
       - alert: TailnetIngressSlow
         expr: probe_duration_seconds{job="blackbox-tailnet-http"} > 5
@@ -183,6 +183,56 @@ groups:
         annotations:
           summary: "SparkyFitness node-exporter scrape failing"
           description: "fitness.ts.gn.al:9100 unreachable for >5m — likely ts-fitness sidecar netns drift; ts-fitness-watchdog should self-heal within 10s. If persistent, manual `docker compose -p cn-fitness up -d --force-recreate --no-deps node-exporter` from /home/gonzalo/cn-fitness on kaiser."
+
+  # ── cn-nvr (Frigate NVR on cerberus.lan) ───────────────────────────────
+  # Scrapes: nvr.ts.gn.al:5000/api/metrics (job frigate) and :9100 (nvr-node).
+  # Storage: frigate_storage_* carries the mount in the `storage` label.
+  - name: cn-nvr
+    rules:
+      - alert: FrigateDown
+        expr: up{job="frigate"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Frigate metrics unreachable"
+          description: "nvr.ts.gn.al:5000/api/metrics down >5m — frigate crashed/restarting or ts-nvr netns drift (watchdog heals in ~30s). `ssh cerberus.lan 'docker compose -p cn-nvr ps; docker logs cn-nvr-frigate-1 --tail=50'`."
+
+      - alert: NvrNodeDown
+        expr: up{job="nvr-node"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cerberus node-exporter unreachable"
+          description: "nvr.ts.gn.al:9100 unreachable >5m — host down, ts-nvr sidecar down, or netns drift. Check `ssh cerberus.lan 'docker compose -p cn-nvr ps'`."
+
+      - alert: FrigateCameraStalled
+        expr: frigate_camera_fps == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Camera {{ $labels.camera_name }} delivering 0 fps"
+          description: "Frigate has received no frames from {{ $labels.camera_name }} for 10m — camera offline, PoE, RTSP credentials or a go2rtc restream problem. On cerberus: `curl -s http://127.0.0.1:15000/api/stats | jq .cameras`, then the go2rtc page under System."
+
+      - alert: FrigateDetectorSlow
+        expr: frigate_detector_inference_speed_seconds > 0.1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Detector {{ $labels.name }} inference >100 ms"
+          description: "OpenVINO on the HD 530 normally runs ~10-20 ms; >100 ms sustained means it fell back to CPU or the iGPU is contended. `docker logs cn-nvr-frigate-1 | grep -i openvino`."
+
+      - alert: FrigateStorageLow
+        expr: frigate_storage_free_bytes{storage=~"/media/frigate/recordings"} / frigate_storage_total_bytes{storage=~"/media/frigate/recordings"} < 0.10
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Frigate recordings volume <10% free"
+          description: "/srv on cerberus is nearly full. Frigate's storage maintainer will start deleting the oldest segments; lower record.continuous/motion days or the Axis bitrate in cn-nvr/config/config.yml.tmpl."
 
   # ── tailnet TLS pre-expiry ──────────────────────────────────────────────
   # *.lab.gn.al is a single LE wildcard renewed by traefik-lab via Cloudflare

@@ -60,6 +60,8 @@ pages:
                     url: https://netbox.lab.gn.al
                   - title: Outline
                     url: https://outline.lab.gn.al
+                  - title: Frigate NVR
+                    url: https://nvr.lab.gn.al
                   - title: raidnas
                     url: https://raidnas.lab.gn.al
                   - title: SMS Archive
@@ -149,6 +151,11 @@ pages:
                 # Outline's `/` 302s to the OIDC login; probe the unauth health
                 # endpoint so the monitor gets a clean 200.
                 check-url: https://outline.lab.gn.al/_health
+              # cn-nvr — `/` 302s to Authentik (forward-auth); /api/version is
+              # routed without the gate (Consul service nvr-health).
+              - title: Frigate NVR
+                url: https://nvr.lab.gn.al
+                check-url: https://nvr.lab.gn.al/api/version
               - title: Vaultwarden
                 url: https://passwords.lab.gn.al
               - title: Filebrowser

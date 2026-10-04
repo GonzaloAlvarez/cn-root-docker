@@ -193,6 +193,27 @@ scrape_configs:
           stack: cn-librechat
           app: mongodb-exporter
 
+  # cn-nvr (Frigate NVR on cerberus) — host metrics from the node-exporter in
+  # the ts-nvr netns, and Frigate's native Prometheus endpoint on its internal
+  # port 5000 (/api/metrics; the authenticated 8971 would 302 to Authentik).
+  # Reachable because tag:infra -> tag:svc:* is allowed in the ACL.
+  - job_name: nvr-node
+    static_configs:
+      - targets: ["nvr.ts.gn.al:9100"]
+        labels:
+          host: nvr
+          stack: cn-nvr
+          app: node-exporter
+
+  - job_name: frigate
+    metrics_path: /api/metrics
+    static_configs:
+      - targets: ["nvr.ts.gn.al:5000"]
+        labels:
+          host: nvr
+          stack: cn-nvr
+          app: frigate
+
   # Blackbox HTTP probes for kaiser-hosted tailnet ingresses. Separate
   # job from blackbox-k8s-http because the k8s-services Grafana dashboard
   # hardcodes job="blackbox-k8s-http" in 5 panel queries — renaming would
@@ -215,6 +236,9 @@ scrape_configs:
           # cn-sms-service — unauthenticated machine healthz on the webhook
           # hostname (the UI hostname 302s to Authentik). Full traefik path.
           - https://smsgw.lab.gn.al/healthz
+          # cn-nvr — Frigate's /api/version is routed WITHOUT the Authentik gate
+          # (Consul service nvr-health), so the probe sees Frigate, not a 302.
+          - https://nvr.lab.gn.al/api/version
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
