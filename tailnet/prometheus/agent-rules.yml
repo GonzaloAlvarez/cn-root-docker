@@ -5,14 +5,6 @@ groups:
   - name: agent-token-expiry
     rules:
       - alert: AgentTokenExpiringSoon
-        expr: vector(1798416000) - time() < 14 * 86400
-        labels:
-          severity: info
-          client: "outline-token"
-        annotations:
-          summary: "agent Outline token (agent-injected-20260929155116) expires 2026-12-28"
-          description: "The gateway-injected Outline token agent-injected-20260929155116 expires on 2026-12-28. Rotate in place with: agent/provision.sh token issue (mints a new one, installs it into the gateway, rotates out the old). Clients are unaffected — they hold no token."
-      - alert: AgentTokenExpiringSoon
         expr: vector(1822608000) - time() < 14 * 86400
         labels:
           severity: info
@@ -20,3 +12,11 @@ groups:
         annotations:
           summary: "agent Outline token (agent-local-am-g0v22k3x1w-20261004230111) expires 2027-10-04"
           description: "The LOCAL Outline token agent-local-am-g0v22k3x1w-20261004230111 (outlinememory skill on am-g0v22k3x1w) expires on 2027-10-04. Rotate ON THAT MACHINE with: agent/provision.sh token issue --local am-g0v22k3x1w --write ~/.outline-token (mints a new key, deletes the previous one with the same label). The gateway is unaffected."
+      - alert: AgentTokenExpiringSoon
+        expr: vector(1798848000) - time() < 14 * 86400
+        labels:
+          severity: info
+          client: "outline-token"
+        annotations:
+          summary: "agent Outline token (agent-injected-20261004230926) expires 2027-01-02"
+          description: "The gateway-injected Outline token agent-injected-20261004230926 expires on 2027-01-02. Rotate in place with: agent/provision.sh token issue (mints a new one, installs it into the gateway, rotates out the old). Clients are unaffected — they hold no token."
