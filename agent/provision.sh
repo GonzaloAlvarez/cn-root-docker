@@ -41,13 +41,19 @@ IDENTITY_GROUPS=knowledge
 COLLECTION=${AGENT_COLLECTION:-Memories}
 API_PORT=8093
 LOCAL_TEST_PORT=${AGENT_LOCAL_TEST_PORT:-18093}
+# Gateway allowlist ≡ injected-token scope. Outline stores these as `/api/<method>` route
+# scopes (apiKeys.create adds the prefix). attachments.create + files.create (2026-10-04)
+# are the two halves of an upload: register the file (JSON), then send the bytes
+# (multipart) — see gateway/api-upload-endpoint.conf and the bundle's "Uploads" recipe.
 SCOPES=(auth.info collections.list collections.info collections.documents documents.list documents.info documents.search
-        documents.create documents.update documents.archive documents.restore documents.delete)
+        documents.create documents.update documents.archive documents.restore documents.delete
+        attachments.create files.create)
 # Minimal scope for per-machine LOCAL keys (`token issue --local`, used by the Claude/Codex
-# outlinememory skill in ~/dev/skill-outlinememory): read the tree, add pages. Deliberately
-# no update/delete — a leaked ~/.outline-token can only add pages under Memories. Re-issue
-# with a wider scope if an "append to an existing memory" feature is ever wanted.
-LOCAL_SCOPES=(auth.info collections.list collections.documents documents.create documents.info)
+# outlinememory skill in ~/dev/skill-outlinememory): read the tree, add pages, upload the
+# images a page embeds (`outline-memory attach` / `create --attach`). Deliberately no
+# update/delete — a leaked ~/.outline-token can only add pages and files under Memories.
+# Re-issue with a wider scope if an "append to an existing memory" feature is ever wanted.
+LOCAL_SCOPES=(auth.info collections.list collections.documents documents.create documents.info attachments.create files.create)
 KEYS_FILE="$HERE/sshd/authorized_keys"
 LEDGER="$HERE/clients.md"
 RULES_FILE="$REPO/tailnet/prometheus/agent-rules.yml"
@@ -493,7 +499,12 @@ Credential   : NONE on the client. Authentication IS the SSH tunnel key; the gat
                injects the Outline token server-side. Do NOT send an Authorization header.
 Collection   : ${COLLECTION}${cid:+  id=${cid}}   (the only collection this identity can see or write)
 Allowed      : ${SCOPES[*]}
-Limits       : 512 KB body · 10 r/s · gateway errors are {"ok":false,"error":...}; Outline errors are Outline JSON
+Uploads      : 1) POST /api/attachments.create {"name","contentType","size"[,"documentId"]}
+                  → data.uploadUrl (RELATIVE — call it on this same base URL), data.form, data.attachment.{id,url}
+               2) POST /api/files.create as multipart/form-data: every data.form field + file=<the bytes>   (≤ 25 MB)
+               3) embed in a page: ![name](data.attachment.url)   (= /api/attachments.redirect?id=<id>)
+               Pass documentId in step 1 (then documents.update the page) to tie the file to the page's lifecycle.
+Limits       : 512 KB body (25 MB for files.create) · 10 r/s · gateway errors are {"ok":false,"error":...}; Outline errors are Outline JSON
 Smoke test   : curl -sS -X POST http://127.0.0.1:${API_PORT}/api/auth.info \\
                  -H 'Content-Type: application/json' -d '{}'
 B
@@ -559,6 +570,33 @@ cmd_test() {
   check "documents.move not allowlisted → 403"   403 "$(c "${NOAUTH[@]}" "$B/api/documents.move")"
   check "shares.create not allowlisted → 403"    403 "$(c "${NOAUTH[@]}" "$B/api/shares.create")"
   check "users.list not allowlisted → 403"       403 "$(c "${NOAUTH[@]}" "$B/api/users.list")"
+
+  log "uploads: attachments.create (JSON) → files.create (multipart) → image embedded in a page"
+  local png psize updoc updid att aid aurl
+  png=$(mktemp "${TMPDIR:-/tmp}/agent-e2e-XXXXXX")
+  printf 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' | base64 -d >"$png"
+  psize=$(wc -c <"$png" | tr -d ' ')
+  updoc=$(curl -s --max-time 25 -X POST -H 'Content-Type: application/json' -d "$(jq -cn --arg c "$cid" '{collectionId:$c,title:"agent e2e upload test",text:"image upload through the tunnel by agent/provision.sh test — safe to delete",publish:true}')" "$B/api/documents.create")
+  updid=$(jq -r '.data.id // empty' <<<"$updoc")
+  att=$(curl -s --max-time 20 -X POST -H 'Content-Type: application/json' -d "$(jq -cn --arg d "$updid" --argjson s "$psize" '{name:"agent-e2e.png",contentType:"image/png",size:$s,documentId:$d}')" "$B/api/attachments.create")
+  aid=$(jq -r '.data.attachment.id // empty' <<<"$att"); aurl=$(jq -r '.data.attachment.url // empty' <<<"$att")
+  check "attachments.create → uploadUrl + form + attachment" ok "$([[ -n "$aid" && "$(jq -r '.data.uploadUrl' <<<"$att")" == /api/files.create ]] && echo ok || echo "fail:$(jq -r '.message // .error // "?"' <<<"$att" | head -c 120)")"
+  if [[ -n "$aid" ]]; then
+    local -a FORM=(); local k v
+    while IFS=$'\t' read -r k v; do FORM+=(--form-string "${k}=${v}"); done < <(jq -r '.data.form | to_entries[] | [.key, .value] | @tsv' <<<"$att")
+    check "files.create (multipart: ${#FORM[@]} form fields + file)" 200 "$(c -X POST "${FORM[@]}" -F "file=@${png};type=image/png;filename=agent-e2e.png" "$B/api/files.create")"
+    check "documents.update embedding the image"  200 "$(c -X POST -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$updid" --arg u "$aurl" '{id:$id,text:("\n\n![agent-e2e](" + $u + ")"),append:true}')" "$B/api/documents.update")"
+    check "documents.info text references the attachment" ok "$([[ "$(curl -s --max-time 20 -X POST -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$updid" '{id:$id}')" "$B/api/documents.info" | jq -r '.data.text')" == *"attachments.redirect?id=${aid}"* ]] && echo ok || echo fail)"
+  fi
+  if [[ -n "$updid" ]]; then
+    check "documents.delete (trash the upload test page)" 200 "$(c -X POST -H 'Content-Type: application/json' -d "$(jq -cn --arg id "$updid" '{id:$id}')" "$B/api/documents.delete")"
+    admin_call documents.delete "$(jq -cn --arg id "$updid" '{id:$id, permanent:true}')" >/dev/null 2>&1 || true
+  fi
+  rm -f "$png"
+  check "files.create with a JSON body → 415"      415 "$(c -X POST -H 'Content-Type: application/json' -d '{}' "$B/api/files.create")"
+  check "files.create declaring 30 MB → 413"       413 "$(c -X POST -H 'Content-Type: multipart/form-data; boundary=x' -H 'Content-Length: 30000000' --data-binary 'x' "$B/api/files.create" || true)"
+  check "GET files.get (download) → 403"           403 "$(c -X GET "$B/api/files.get?key=x")"
+  check "attachments.delete not allowlisted → 403" 403 "$(c "${NOAUTH[@]}" "$B/api/attachments.delete")"
   close_fwd "$ctl"
 
   log "public-leak check (traefik-public must not expose the gateway)"

@@ -21,6 +21,7 @@ client ── ssh -N -L 127.0.0.1:8093:127.0.0.1:8093 agent@hs.gn.al ──▶ s
                                                                       ▼
    POST http://127.0.0.1:8093/api/<method>   (NO Authorization) ──▶ agent-api-gw (nginx, bridge 172.18.0.6, loopback publish)
                                                                       │ POST+JSON only · exact allowlist · 512 KB · 10 r/s
+                                                                      │ (files.create: multipart, 25 MB — the upload bytes)
                                                                       │ injects Authorization: Bearer <server-side token>
                                                                       ▼ https://ts-infra:443  (Host/SNI outline.lab.gn.al, LE verified)
                                                                 traefik-lab → 10.1.1.92:443 → Outline
@@ -42,6 +43,7 @@ scope = the same allowlist + 90-day expiry; (5) explicit `Memories`-only members
 | `gateway/backend-outline.conf` | **swap seam**: the exact-match method allowlist (server block) |
 | `gateway/backend-outline-upstream.conf` | **swap seam**: Host/SNI/TLS to traefik-lab + `include /tmp/agent-token.conf` (server-side token injection) |
 | `gateway/api-endpoint.conf` | per-location guard: source IP, POST-only, JSON-only, `proxy_pass $uri` |
+| `gateway/api-upload-endpoint.conf` | the `files.create` variant of that guard: multipart/form-data body up to 25 MB (Outline's own `FILE_STORAGE_UPLOAD_MAX_SIZE`), everything else identical |
 | `sshd/50-agent.conf` | the `Match User agent` block |
 | `sshd/authorized_keys` | registered client public keys (`ssh-ed25519 … client=<label>`) — public material |
 | `sshd/install.sh` / `uninstall.sh` | root-level installer on the VPS with operator-lockout guards + auto-revert timer |
@@ -56,15 +58,39 @@ nginx sets `Authorization: Bearer <token>` from there on every upstream call.
 
 `auth.info collections.list collections.info collections.documents documents.list
 documents.info documents.search documents.create documents.update documents.archive
-documents.restore documents.delete`
+documents.restore documents.delete attachments.create files.create`
+
+Outline stores these as route scopes (`/api/<method>`; `apiKeys.create` adds the
+prefix) and enforces them on every `/api/*` call, plugin routes included — so a key
+without `files.create` cannot upload even when `attachments.create` is allowed.
+
+**Uploads (added 2026-10-04)** are two calls because Outline splits "register a
+file" from "send its bytes" (local file storage on cn-outline):
+
+1. `POST /api/attachments.create` `{"name","contentType","size"[,"documentId"]}` — JSON,
+   512 KB like everything else. Returns `data.uploadUrl` (`/api/files.create`, a
+   **relative** path the client must call on the same gateway base URL), `data.form`
+   (the fields to echo back) and `data.attachment.{id,url}`.
+2. `POST /api/files.create` as `multipart/form-data`: every `data.form` field plus
+   `file=<bytes>`. Up to 25 MB (Outline's `FILE_STORAGE_UPLOAD_MAX_SIZE`; the gateway
+   enforces the same number, JSON `413` above it). Outline writes the bytes only to an
+   attachment the **same user** registered, and only up to the declared `size`.
+3. Embed as `![name](data.attachment.url)` (= `/api/attachments.redirect?id=<id>`).
+   Pass `documentId` in step 1 (then `documents.update` the page) to tie the file to the
+   page's lifecycle; without it the attachment stays team-scoped and is not removed when
+   the page is deleted. Reading files back (`files.get`, `attachments.redirect`) is not
+   allowlisted: the agent writes images, humans view them in Outline.
 
 Excluded on purpose: `documents.move` (cross-collection), `documents.import`,
-`documents.export`, `attachments.*` (uploads), `shares.*`, `apiKeys.*`, `users.*`,
-`groups.*`, `team.*`, `events.*`, `revisions.*`, `views.*`, `/realtime`, all UI paths.
-The gateway also refuses GET (405), non-JSON (415), bodies > 512 KB (413), > 10 r/s
-(429), and any source other than the host loopback publish (403). Traversal / `//`
-/ `%2e` are normalised before matching and only the normalised `$uri` is forwarded.
-Any `Authorization` the client sends is overwritten by the injected token.
+`documents.export`, `attachments.list/delete/redirect/createFromUrl`, `files.get`
+(downloads), `shares.*`, `apiKeys.*`, `users.*`, `groups.*`, `team.*`, `events.*`,
+`revisions.*`, `views.*`, `/realtime`, all UI paths.
+The gateway also refuses GET (405), the wrong body type (415: JSON everywhere,
+multipart only on `files.create`), bodies over the cap (413: 512 KB, 25 MB for
+`files.create`), > 10 r/s (429), and any source other than the host loopback publish
+(403). Traversal / `//` / `%2e` are normalised before matching and only the normalised
+`$uri` is forwarded. Any `Authorization` the client sends is overwritten by the
+injected token.
 
 ## Operator workflow
 
@@ -106,6 +132,14 @@ ssh -N -o BatchMode=yes -o ExitOnForwardFailure=yes \
 # autossh: autossh -M 0 -N <same options>   (autossh's default -M uses a remote forward, which is denied)
 curl -sS -X POST http://127.0.0.1:8093/api/documents.search \
      -H 'Content-Type: application/json' -d '{"query":"…"}'      # NO Authorization header — the gateway injects it
+
+# Upload an image (two calls), then embed it in a page:
+att=$(curl -sS -X POST http://127.0.0.1:8093/api/attachments.create -H 'Content-Type: application/json' \
+     -d "{\"name\":\"shot.png\",\"contentType\":\"image/png\",\"size\":$(wc -c < shot.png)}")
+curl -sS -X POST "http://127.0.0.1:8093$(jq -r .data.uploadUrl <<<"$att")" \
+     $(jq -r '.data.form | to_entries[] | "--form-string \(.key)=\(.value)"' <<<"$att") \
+     -F 'file=@shot.png;type=image/png'                           # multipart, ≤ 25 MB → {"success":true}
+echo "![shot]($(jq -r .data.attachment.url <<<"$att"))"            # → ![shot](/api/attachments.redirect?id=…) for documents.create/update
 ```
 
 * Send **no** `Authorization` header. The SSH key is the credential; the gateway attaches the Outline token.
@@ -114,6 +148,7 @@ curl -sS -X POST http://127.0.0.1:8093/api/documents.search \
 * Responses may contain absolute `https://outline.lab.gn.al/…` URLs the client cannot fetch.
 * Gateway errors are `{"ok":false,"error":…}` with 403/405/413/415/429; Outline errors arrive as Outline JSON.
 * Idle tunnels stay up (`ClientAlive 30×3`, no `UnusedConnectionTimeout`); a forward idle > 15 min is closed (`ChannelTimeout`) — reconnect.
+* Uploads: `attachments.create` (JSON) then `files.create` (multipart, every `form` field + `file`, ≤ 25 MB) — the `uploadUrl` is relative to the gateway base URL. Shell quoting of the form fields is the usual trap; `--form-string` (not `-F`) for the returned fields, `-F file=@…` for the bytes.
 
 ## How the automation works (verified 2026-09-29)
 
@@ -150,7 +185,9 @@ or through the SOCKS proxy, never through the gateway, so each one needs its own
 - `provision.sh token issue --local <label> [--expires-days 365] [--write ~/.outline-token]`
   mints `agent-local-<label>-<ts>` on the same `agent` user with the minimal
   `LOCAL_SCOPES` (`auth.info collections.list collections.documents documents.create
-  documents.info` — read the tree, add pages; no update/delete). Label = lowercase
+  documents.info attachments.create files.create` — read the tree, add pages, upload the
+  images a page embeds via `outline-memory attach` / `create --attach`; no update/delete).
+  A key minted before 2026-10-04 lacks the two upload scopes: re-issue it. Label = lowercase
   `hostname -s`. No admin token is needed (self-service inside the agent's OIDC session,
   which is reactivated and deactivated like for the gateway key). The secret is printed
   once or written 0600 to `--write`; it is never stored in git or the ledger.
