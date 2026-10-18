@@ -8,12 +8,24 @@
     "tag:devbox":     ["gonzaloab@gmail.com"]
   },
 
+  // Named hosts for narrow rules (tailnet IPs are stable per node).
+  "hosts": {
+    "klaus":       "100.64.0.37/32",
+    "travelblock": "100.64.0.44/32"
+  },
+
   "acls": [
     { "action": "accept", "src": ["*"], "dst": ["tag:infra:53", "tag:infra:443"] },
     { "action": "accept", "src": ["tag:infra"], "dst": ["tag:svc:*"] },
     { "action": "accept", "src": ["tag:svc"], "dst": ["tag:infra:8500"] },
     { "action": "accept", "src": ["tag:svc"], "dst": ["tag:infra:3100"] },
     { "action": "accept", "src": ["gonzaloab@gmail.com"], "dst": ["tag:svc:*"] },
+
+    // cn-llmrouter (kaiser, tag:svc) fronts the personal llama-servers. The
+    // LAN is its primary path; these are the tailnet extras for the two boxes
+    // that roam (minerva has no tailscale). Same port the operator already
+    // reaches on them directly — single purpose, single port.
+    { "action": "accept", "src": ["tag:svc"], "dst": ["klaus:8080", "travelblock:8080"] },
     { "action": "accept", "src": ["admin@"], "dst": ["admin@:*"] },
 
     // k8s-router advertises 10.0.0.192/27 (cluster MetalLB pool). Allow VPS Traefik

@@ -184,6 +184,27 @@ groups:
           summary: "SparkyFitness node-exporter scrape failing"
           description: "fitness.ts.gn.al:9100 unreachable for >5m — likely ts-fitness sidecar netns drift; ts-fitness-watchdog should self-heal within 10s. If persistent, manual `docker compose -p cn-fitness up -d --force-recreate --no-deps node-exporter` from /home/gonzalo/cn-fitness on kaiser."
 
+  # ── cn-llmrouter (LiteLLM gateway on kaiser) ────────────────────────────
+  - name: cn-llmrouter
+    rules:
+      - alert: LLMRouterDown
+        expr: up{job="llmrouter"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "LLM router metrics scrape failing"
+          description: "llmrouter.ts.gn.al:4000/metrics unreachable for >5m — LiteLLM crashed, or ts-llmrouter sidecar netns drift (ts-llmrouter-watchdog self-heals in ~30s). While down, every Claude Code / qwen-code client pointed at llmrouter.lab.gn.al fails. On kaiser: `docker compose -p cn-llmrouter ps` and `docker logs cn-llmrouter-litellm-1 --tail=50`."
+
+      - alert: LLMRouterDeploymentFailures
+        expr: sum by (api_base, litellm_model_name) (increase(litellm_deployment_failure_responses[30m])) > 20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM router: a backend keeps failing"
+          description: "{{ $labels.litellm_model_name }} at {{ $labels.api_base }} failed >20 requests in 30m. A sleeping/off local box is normal (cooldown handles it); a cloud provider failing means a bad key, quota, or a model id change — check `docker logs cn-llmrouter-litellm-1` on kaiser."
+
   # ── cn-nvr (Frigate NVR on cerberus.lan) ───────────────────────────────
   # Scrapes: nvr.ts.gn.al:5000/api/metrics (job frigate) and :9100 (nvr-node).
   # Storage: frigate_storage_* carries the mount in the `storage` label.

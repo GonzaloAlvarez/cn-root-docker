@@ -214,6 +214,17 @@ scrape_configs:
           stack: cn-nvr
           app: frigate
 
+  # cn-llmrouter — LiteLLM gateway on kaiser (ts-llmrouter sidecar). Its
+  # Prometheus callback exports per-model/per-deployment request, failure,
+  # latency, token and spend series on :4000/metrics (OSS feature).
+  - job_name: llmrouter
+    static_configs:
+      - targets: ["llmrouter.ts.gn.al:4000"]
+        labels:
+          host: llmrouter
+          stack: cn-llmrouter
+          app: litellm
+
   # Blackbox HTTP probes for kaiser-hosted tailnet ingresses. Separate
   # job from blackbox-k8s-http because the k8s-services Grafana dashboard
   # hardcodes job="blackbox-k8s-http" in 5 panel queries — renaming would
@@ -239,6 +250,8 @@ scrape_configs:
           # cn-nvr — Frigate's /api/version is routed WITHOUT the Authentik gate
           # (Consul service nvr-health), so the probe sees Frigate, not a 302.
           - https://nvr.lab.gn.al/api/version
+          # cn-llmrouter — LiteLLM liveliness (unauthenticated; the router has no key)
+          - https://llmrouter.lab.gn.al/health/liveliness
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
