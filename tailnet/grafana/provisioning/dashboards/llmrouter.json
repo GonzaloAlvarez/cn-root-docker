@@ -1,0 +1,732 @@
+{
+ "uid": "llmrouter",
+ "title": "LLM Router (cn-llmrouter)",
+ "tags": [
+  "homelab",
+  "cn-llmrouter"
+ ],
+ "timezone": "browser",
+ "schemaVersion": 39,
+ "version": 1,
+ "editable": true,
+ "refresh": "1m",
+ "time": {
+  "from": "now-24h",
+  "to": "now"
+ },
+ "panels": [
+  {
+   "id": 1,
+   "type": "stat",
+   "title": "Router up (VPS scrape)",
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 0,
+    "y": 0
+   },
+   "targets": [
+    {
+     "expr": "up{job=\"llmrouter\"}",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "colorMode": "background",
+    "graphMode": "none",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 1
+       }
+      ]
+     },
+     "mappings": [
+      {
+       "type": "value",
+       "options": {
+        "0": {
+         "text": "DOWN",
+         "color": "red"
+        },
+        "1": {
+         "text": "UP",
+         "color": "green"
+        }
+       }
+      }
+     ]
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 2,
+   "type": "stat",
+   "title": "Tailnet probe (liveliness)",
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 4,
+    "y": 0
+   },
+   "targets": [
+    {
+     "expr": "probe_success{instance=\"https://llmrouter.lab.gn.al/health/liveliness\"}",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "colorMode": "background",
+    "graphMode": "none",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "red",
+        "value": null
+       },
+       {
+        "color": "green",
+        "value": 1
+       }
+      ]
+     },
+     "mappings": [
+      {
+       "type": "value",
+       "options": {
+        "0": {
+         "text": "FAIL",
+         "color": "red"
+        },
+        "1": {
+         "text": "OK",
+         "color": "green"
+        }
+       }
+      }
+     ]
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 3,
+   "type": "stat",
+   "title": "Requests (24h)",
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 8,
+    "y": 0
+   },
+   "targets": [
+    {
+     "expr": "sum(increase(litellm_proxy_total_requests_metric_total[24h]))",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "decimals": 0
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 4,
+   "type": "stat",
+   "title": "Spend (24h)",
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 12,
+    "y": 0
+   },
+   "targets": [
+    {
+     "expr": "sum(increase(litellm_spend_metric_total[24h]))",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "unit": "currencyUSD",
+     "decimals": 2
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 5,
+   "type": "stat",
+   "title": "Backend cooldowns (24h)",
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 16,
+    "y": 0
+   },
+   "targets": [
+    {
+     "expr": "sum(increase(litellm_deployment_cooled_down_total[24h])) or vector(0)",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "decimals": 0
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 6,
+   "type": "stat",
+   "title": "In flight",
+   "gridPos": {
+    "h": 4,
+    "w": 4,
+    "x": 20,
+    "y": 0
+   },
+   "targets": [
+    {
+     "expr": "sum(litellm_in_flight_requests) or vector(0)",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "colorMode": "value",
+    "graphMode": "none",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       }
+      ]
+     },
+     "decimals": 0
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 7,
+   "type": "timeseries",
+   "title": "Requests / min by requested row",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 4
+   },
+   "targets": [
+    {
+     "expr": "sum by (requested_model) (rate(litellm_proxy_total_requests_metric_total[5m])) * 60",
+     "legendFormat": "{{requested_model}}",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never"
+     },
+     "unit": "reqpm"
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 8,
+   "type": "timeseries",
+   "title": "Served by backend (successes / min)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 4
+   },
+   "targets": [
+    {
+     "expr": "sum by (api_base, litellm_model_name) (rate(litellm_deployment_success_responses_total[5m])) * 60",
+     "legendFormat": "{{litellm_model_name}} @ {{api_base}}",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never"
+     },
+     "unit": "reqpm"
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 9,
+   "type": "timeseries",
+   "title": "Backend failures / min (sleeping boxes cool down; cloud failures mean key/quota/model id)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 12
+   },
+   "targets": [
+    {
+     "expr": "sum by (api_base, litellm_model_name, exception_class) (rate(litellm_deployment_failure_responses_total[5m])) * 60",
+     "legendFormat": "{{litellm_model_name}} @ {{api_base}} {{exception_class}}",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never"
+     },
+     "unit": "reqpm"
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 10,
+   "type": "table",
+   "title": "Deployment state (0 healthy \u00b7 1 partial outage \u00b7 2 outage)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 12
+   },
+   "targets": [
+    {
+     "expr": "litellm_deployment_state",
+     "format": "table",
+     "instant": true,
+     "refId": "A"
+    }
+   ],
+   "transformations": [
+    {
+     "id": "organize",
+     "options": {
+      "excludeByName": {
+       "Time": true,
+       "__name__": true,
+       "instance": true,
+       "job": true,
+       "host": true,
+       "stack": true,
+       "app": true,
+       "model_id": true
+      },
+      "renameByName": {
+       "Value": "state"
+      }
+     }
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "state"
+      },
+      "properties": [
+       {
+        "id": "mappings",
+        "value": [
+         {
+          "type": "value",
+          "options": {
+           "0": {
+            "text": "healthy",
+            "color": "green"
+           },
+           "1": {
+            "text": "partial",
+            "color": "orange"
+           },
+           "2": {
+            "text": "outage",
+            "color": "red"
+           }
+          }
+         }
+        ]
+       },
+       {
+        "id": "custom.cellOptions",
+        "value": {
+         "type": "color-background"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "options": {
+    "showHeader": true
+   }
+  },
+  {
+   "id": 11,
+   "type": "timeseries",
+   "title": "Tokens / min by requested row",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 20
+   },
+   "targets": [
+    {
+     "expr": "sum by (requested_model) (rate(litellm_input_tokens_metric_total[5m])) * 60",
+     "legendFormat": "in {{requested_model}}",
+     "refId": "A"
+    },
+    {
+     "expr": "sum by (requested_model) (rate(litellm_output_tokens_metric_total[5m])) * 60",
+     "legendFormat": "out {{requested_model}}",
+     "refId": "B"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 12,
+   "type": "bargauge",
+   "title": "Spend by row (24h, USD)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 20
+   },
+   "targets": [
+    {
+     "expr": "sum by (requested_model) (increase(litellm_spend_metric_total[24h])) > 0",
+     "legendFormat": "{{requested_model}}",
+     "instant": true,
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "orientation": "horizontal",
+    "displayMode": "gradient",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "",
+     "values": false
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "currencyUSD",
+     "decimals": 3,
+     "color": {
+      "mode": "continuous-GrYlRd"
+     }
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 13,
+   "type": "timeseries",
+   "title": "API latency p50 / p95 by requested row",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 28
+   },
+   "targets": [
+    {
+     "expr": "histogram_quantile(0.5, sum by (le, requested_model) (rate(litellm_llm_api_latency_metric_bucket[10m])))",
+     "legendFormat": "p50 {{requested_model}}",
+     "refId": "A"
+    },
+    {
+     "expr": "histogram_quantile(0.95, sum by (le, requested_model) (rate(litellm_llm_api_latency_metric_bucket[10m])))",
+     "legendFormat": "p95 {{requested_model}}",
+     "refId": "B"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never"
+     },
+     "unit": "s"
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 14,
+   "type": "timeseries",
+   "title": "What `auto` picked (successes / min by backend)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 28
+   },
+   "targets": [
+    {
+     "expr": "sum by (api_base, litellm_model_name) (rate(litellm_deployment_success_responses_total{requested_model=~\"auto.*\"}[15m])) * 60",
+     "legendFormat": "{{litellm_model_name}} @ {{api_base}}",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "table",
+     "placement": "bottom",
+     "calcs": [
+      "lastNotNull",
+      "max"
+     ]
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "lineWidth": 1,
+      "fillOpacity": 10,
+      "showPoints": "never"
+     },
+     "unit": "reqpm"
+    },
+    "overrides": []
+   }
+  },
+  {
+   "id": 15,
+   "type": "logs",
+   "title": "Routing decisions, fallbacks and cooldowns (LiteLLM log via promtail)",
+   "gridPos": {
+    "h": 10,
+    "w": 24,
+    "x": 0,
+    "y": 36
+   },
+   "datasource": {
+    "type": "loki",
+    "uid": "loki"
+   },
+   "targets": [
+    {
+     "expr": "{stack=\"cn-llmrouter\", app=\"litellm\"} |~ \"routing decision|Falling back|cooldown|cn-llmrouter hints\"",
+     "refId": "A"
+    }
+   ],
+   "options": {
+    "showTime": true,
+    "wrapLogMessage": true,
+    "sortOrder": "Descending",
+    "dedupStrategy": "none",
+    "enableLogDetails": true
+   }
+  }
+ ]
+}
