@@ -280,6 +280,39 @@ pages:
               - title: Home Assistant
                 url: https://ha.lab.gn.al
 
+          # cn-collie — Collie phone clients for Herdr on operator machines. Every
+          # instance registers itself in Consul as `collie-<name>` with the tag
+          # `collie` and an HTTP check on /api/health; a machine that leaves the
+          # tailnet is deregistered two minutes later, so this list IS the set of
+          # reachable sessions. Consul shares the ts-infra namespace → loopback.
+          # Dynamic by design: no bookmark/monitor row per instance.
+          - type: custom-api
+            title: Herdr sessions
+            cache: 30s
+            url: http://127.0.0.1:8500/v1/health/state/any
+            parameters:
+              filter: ServiceTags contains "collie"
+            template: |
+              {{ if ne .Response.StatusCode 200 }}
+                <p class="color-negative">Consul answered {{ .Response.StatusCode }}</p>
+              {{ else }}
+                {{ $checks := .JSON.Array "" }}
+                {{ if eq (len $checks) 0 }}
+                  <p class="color-subdue">No Collie session is registered.</p>
+                {{ else }}
+                  <ul class="list list-gap-10">
+                  {{ range $checks }}
+                    {{ $name := .String "ServiceName" | trimPrefix "collie-" }}
+                    <li class="flex items-center gap-10">
+                      <span class="{{ if eq (.String "Status") "passing" }}color-positive{{ else }}color-negative{{ end }}">●</span>
+                      <a class="size-h4 color-highlight" href="https://{{ $name }}.lab.gn.al" target="_blank" rel="noreferrer">{{ $name }}</a>
+                      <span class="color-subdue">{{ .String "Status" }}</span>
+                    </li>
+                  {{ end }}
+                  </ul>
+                {{ end }}
+              {{ end }}
+
           - type: videos
             channels:
               - UCNUzWfHUP_iXZ1GMHz8gBgw  # @ryukahr
