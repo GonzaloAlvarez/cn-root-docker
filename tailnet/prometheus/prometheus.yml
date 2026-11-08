@@ -260,7 +260,7 @@ scrape_configs:
   # proxy debug server, published on 0.0.0.0:9205 inside the netns.
   - job_name: opencloud-node
     static_configs:
-      - targets: ["drive.ts.gn.al:9100"]
+      - targets: ["drive.ts.gn.al:9400"]   # 9100 is OpenCloud's web service inside the netns
         labels:
           host: drive
           stack: cn-opencloud
