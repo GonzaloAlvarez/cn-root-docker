@@ -62,6 +62,8 @@ pages:
                     url: https://netbox.lab.gn.al
                   - title: Outline
                     url: https://outline.lab.gn.al
+                  - title: OpenCloud
+                    url: https://drive.lab.gn.al
                   - title: Paperless
                     url: https://docs.lab.gn.al
                   - title: Frigate NVR
@@ -269,6 +271,11 @@ pages:
               - title: Paperless
                 url: https://docs.lab.gn.al
                 check-url: https://docs.lab.gn.al/accounts/login/
+              # cn-opencloud — OpenCloud on kaiser via ts-drive. /status.php is the
+              # unauthenticated 200 (the UI root bounces to Authentik).
+              - title: OpenCloud
+                url: https://drive.lab.gn.al
+                check-url: https://drive.lab.gn.al/status.php
               # cn-exercises — static exercises-dataset site (nginx on kaiser
               # via ts-exercises). `/` returns 200 unauth, no check-url needed.
               - title: Exercises

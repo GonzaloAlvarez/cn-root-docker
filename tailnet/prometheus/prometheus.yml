@@ -254,6 +254,26 @@ scrape_configs:
           stack: cn-paperless
           app: paperless-exporter
 
+  # cn-opencloud (OpenCloud on kaiser, ts-drive sidecar) — host metrics from
+  # the node-exporter in the netns and OpenCloud's own proxy metrics
+  # (opencloud_proxy_requests_total / errors_total / duration_seconds) from the
+  # proxy debug server, published on 0.0.0.0:9205 inside the netns.
+  - job_name: opencloud-node
+    static_configs:
+      - targets: ["drive.ts.gn.al:9100"]
+        labels:
+          host: drive
+          stack: cn-opencloud
+          app: node-exporter
+
+  - job_name: opencloud
+    static_configs:
+      - targets: ["drive.ts.gn.al:9205"]
+        labels:
+          host: drive
+          stack: cn-opencloud
+          app: opencloud
+
   # Blackbox HTTP probes for kaiser-hosted tailnet ingresses. Separate
   # job from blackbox-k8s-http because the k8s-services Grafana dashboard
   # hardcodes job="blackbox-k8s-http" in 5 panel queries — renaming would
@@ -284,6 +304,8 @@ scrape_configs:
           # cn-paperless — /api/ answers 401 unauthenticated (valid for this
           # module) through the full traefik-lab → ts-docs path.
           - https://docs.lab.gn.al/api/
+          # cn-opencloud — /status.php is unauthenticated JSON (200) through traefik-lab → ts-drive
+          - https://drive.lab.gn.al/status.php
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

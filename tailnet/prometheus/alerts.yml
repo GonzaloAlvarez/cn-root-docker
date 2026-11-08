@@ -155,7 +155,7 @@ groups:
           severity: critical
         annotations:
           summary: "{{ $labels.instance }} ingress probe failing"
-          description: "blackbox-tailnet-http got a status outside valid_status_codes (or no response) for >5m on {{ $labels.instance }} — the VPS traefik-lab → backend path is failing or returning an unexpected code. The backend depends on the host in the URL: fitness.lab.gn.al → kaiser cn-fitness; *.fxa.lab.gn.al → neptune cn-mzfxa; sync.lab.gn.al → neptune cn-mzsync; nvr.lab.gn.al → cerberus cn-nvr; docs.lab.gn.al → kaiser cn-paperless. SSH the owning host and check that stack's `docker compose ps` + logs, plus the VPS traefik-lab route."
+          description: "blackbox-tailnet-http got a status outside valid_status_codes (or no response) for >5m on {{ $labels.instance }} — the VPS traefik-lab → backend path is failing or returning an unexpected code. The backend depends on the host in the URL: fitness.lab.gn.al → kaiser cn-fitness; *.fxa.lab.gn.al → neptune cn-mzfxa; sync.lab.gn.al → neptune cn-mzsync; nvr.lab.gn.al → cerberus cn-nvr; docs.lab.gn.al → kaiser cn-paperless; drive.lab.gn.al → kaiser cn-opencloud. SSH the owning host and check that stack's `docker compose ps` + logs, plus the VPS traefik-lab route."
 
       - alert: TailnetIngressSlow
         expr: probe_duration_seconds{job="blackbox-tailnet-http"} > 5
@@ -231,6 +231,45 @@ groups:
         annotations:
           summary: "Paperless sanity check failing"
           description: "The weekly sanity check reports missing or inconsistent files (originals/archive/thumbnails) — the NFS media tree may have been touched outside Paperless. Run `docker compose -p cn-paperless exec webserver document_sanity_checker` on kaiser and read its output."
+
+  # ── cn-opencloud (OpenCloud on kaiser) ──────────────────────────────────
+  - name: cn-opencloud
+    rules:
+      - alert: OpenCloudDown
+        expr: up{job="opencloud"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OpenCloud metrics scrape failing"
+          description: "drive.ts.gn.al:9205 (OpenCloud proxy debug server) unreachable for >5m — the single OpenCloud container is down or wedged. `docker compose -p cn-opencloud ps` and `logs --tail=100 opencloud` on kaiser; the stack has a boot unit and a reconciler."
+
+      - alert: OpenCloudNodeDown
+        expr: up{job="opencloud-node"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OpenCloud node-exporter scrape failing"
+          description: "drive.ts.gn.al:9100 unreachable for >5m — likely ts-drive sidecar netns drift (ts-drive-watchdog self-heals in ~30s) or the whole stack is down."
+
+      - alert: OpenCloudBackupStale
+        expr: time() - opencloud_backup_last_success_timestamp_seconds > 8 * 86400
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "OpenCloud restic backup is older than 8 days"
+          description: "cn-opencloud/scripts/backup.sh (Sunday 06:00 via amun-docker cron) has not reported a successful restic run for over 8 days. Check `journalctl -t cn-opencloud-backup` on kaiser, the raidnas NFS mount and the S3 copy step."
+
+      - alert: OpenCloudBackupNeverRan
+        expr: absent(opencloud_backup_last_success_timestamp_seconds)
+        for: 10d
+        labels:
+          severity: info
+        annotations:
+          summary: "No OpenCloud backup metric has ever been scraped"
+          description: "opencloud_backup_last_success_timestamp_seconds is absent for 10 days — the backup cron never completed on kaiser (resiliency.yml cron → scripts/backup.sh writes it into the node-exporter textfile dir)."
 
   # ── cn-llmrouter (LiteLLM gateway on kaiser) ────────────────────────────
   - name: cn-llmrouter
