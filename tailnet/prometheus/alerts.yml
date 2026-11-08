@@ -155,7 +155,7 @@ groups:
           severity: critical
         annotations:
           summary: "{{ $labels.instance }} ingress probe failing"
-          description: "blackbox-tailnet-http got a status outside valid_status_codes (or no response) for >5m on {{ $labels.instance }} — the VPS traefik-lab → backend path is failing or returning an unexpected code. The backend depends on the host in the URL: fitness.lab.gn.al → kaiser cn-fitness; *.fxa.lab.gn.al → neptune cn-mzfxa; sync.lab.gn.al → neptune cn-mzsync; nvr.lab.gn.al → cerberus cn-nvr. SSH the owning host and check that stack's `docker compose ps` + logs, plus the VPS traefik-lab route."
+          description: "blackbox-tailnet-http got a status outside valid_status_codes (or no response) for >5m on {{ $labels.instance }} — the VPS traefik-lab → backend path is failing or returning an unexpected code. The backend depends on the host in the URL: fitness.lab.gn.al → kaiser cn-fitness; *.fxa.lab.gn.al → neptune cn-mzfxa; sync.lab.gn.al → neptune cn-mzsync; nvr.lab.gn.al → cerberus cn-nvr; docs.lab.gn.al → kaiser cn-paperless. SSH the owning host and check that stack's `docker compose ps` + logs, plus the VPS traefik-lab route."
 
       - alert: TailnetIngressSlow
         expr: probe_duration_seconds{job="blackbox-tailnet-http"} > 5
@@ -183,6 +183,54 @@ groups:
         annotations:
           summary: "SparkyFitness node-exporter scrape failing"
           description: "fitness.ts.gn.al:9100 unreachable for >5m — likely ts-fitness sidecar netns drift; ts-fitness-watchdog should self-heal within 10s. If persistent, manual `docker compose -p cn-fitness up -d --force-recreate --no-deps node-exporter` from /home/gonzalo/cn-fitness on kaiser."
+
+  # ── cn-paperless (Paperless-ngx on kaiser) ──────────────────────────────
+  - name: cn-paperless
+    rules:
+      - alert: PaperlessPostgresDown
+        expr: up{job="paperless-postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Paperless Postgres scrape failing"
+          description: "postgres-exporter at docs.ts.gn.al:9187 unreachable for >2m — DB container likely down. Check `ssh kaiser.lan 'docker logs cn-paperless-db-1 --tail=50'`."
+
+      - alert: PaperlessNodeDown
+        expr: up{job="paperless-node"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Paperless node-exporter scrape failing"
+          description: "docs.ts.gn.al:9100 unreachable for >5m — likely ts-docs sidecar netns drift (ts-docs-watchdog self-heals in ~30s) or the whole stack is down (NFS gate: `systemctl status docker-compose@cn-paperless` on kaiser)."
+
+      - alert: PaperlessExporterDown
+        expr: up{job="paperless"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "paperless-exporter scrape failing"
+          description: "docs.ts.gn.al:8081 unreachable for >10m — exporter container down or Paperless API not answering. `docker compose -p cn-paperless logs --tail=50 paperless-exporter webserver` on kaiser."
+
+      - alert: PaperlessUnhealthy
+        expr: (paperless_status_database_status == 0) or (paperless_status_redis_status == 0) or (paperless_status_celery_status == 0) or (paperless_status_index_status == 0)
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Paperless reports an unhealthy component"
+          description: "Paperless's own /api/status/ reports database, redis, celery or the search index as not OK for >10m — consumption and search are affected. Check `docker compose -p cn-paperless logs --tail=100 webserver` and `document_sanity_checker` on kaiser."
+
+      - alert: PaperlessSanityCheckFailed
+        expr: paperless_status_sanity_check_status == 0
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Paperless sanity check failing"
+          description: "The weekly sanity check reports missing or inconsistent files (originals/archive/thumbnails) — the NFS media tree may have been touched outside Paperless. Run `docker compose -p cn-paperless exec webserver document_sanity_checker` on kaiser and read its output."
 
   # ── cn-llmrouter (LiteLLM gateway on kaiser) ────────────────────────────
   - name: cn-llmrouter

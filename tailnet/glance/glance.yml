@@ -62,6 +62,8 @@ pages:
                     url: https://netbox.lab.gn.al
                   - title: Outline
                     url: https://outline.lab.gn.al
+                  - title: Paperless
+                    url: https://docs.lab.gn.al
                   - title: Frigate NVR
                     url: https://nvr.lab.gn.al
                   # cn-printer on printer.lan — plain HTTP by port on the ts-printer
@@ -261,6 +263,12 @@ pages:
               # when OPENID_AUTO_REDIRECT is false, so the default probe works.
               - title: LibreChat
                 url: https://chat.lab.gn.al
+              # cn-paperless — Paperless-ngx on kaiser via ts-docs. `/` 302s to the
+              # login page (200 unauth); probe that page so SSO-only users still
+              # get a green light.
+              - title: Paperless
+                url: https://docs.lab.gn.al
+                check-url: https://docs.lab.gn.al/accounts/login/
               # cn-exercises — static exercises-dataset site (nginx on kaiser
               # via ts-exercises). `/` returns 200 unauth, no check-url needed.
               - title: Exercises

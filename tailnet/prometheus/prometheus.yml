@@ -225,6 +225,35 @@ scrape_configs:
           stack: cn-llmrouter
           app: litellm
 
+  # cn-paperless (Paperless-ngx on kaiser, ts-docs sidecar) — host metrics
+  # from the node-exporter in the netns, Postgres via postgres-exporter, and
+  # app metrics via hansmi/prometheus-paperless-exporter (REST API):
+  # paperless_status_* (database/redis/celery/index/sanity health),
+  # paperless_statistics_* (document/tag counts), paperless_task_*.
+  - job_name: paperless-node
+    static_configs:
+      - targets: ["docs.ts.gn.al:9100"]
+        labels:
+          host: docs
+          stack: cn-paperless
+          app: node-exporter
+
+  - job_name: paperless-postgres
+    static_configs:
+      - targets: ["docs.ts.gn.al:9187"]
+        labels:
+          stack: cn-paperless
+          app: postgres-exporter
+
+  - job_name: paperless
+    scrape_interval: 60s
+    static_configs:
+      - targets: ["docs.ts.gn.al:8081"]
+        labels:
+          host: docs
+          stack: cn-paperless
+          app: paperless-exporter
+
   # Blackbox HTTP probes for kaiser-hosted tailnet ingresses. Separate
   # job from blackbox-k8s-http because the k8s-services Grafana dashboard
   # hardcodes job="blackbox-k8s-http" in 5 panel queries — renaming would
@@ -252,6 +281,9 @@ scrape_configs:
           - https://nvr.lab.gn.al/api/version
           # cn-llmrouter — LiteLLM liveliness (unauthenticated; the router has no key)
           - https://llmrouter.lab.gn.al/health/liveliness
+          # cn-paperless — /api/ answers 401 unauthenticated (valid for this
+          # module) through the full traefik-lab → ts-docs path.
+          - https://docs.lab.gn.al/api/
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
