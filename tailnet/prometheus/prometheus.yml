@@ -296,6 +296,8 @@ scrape_configs:
           # cn-sms-service — unauthenticated machine healthz on the webhook
           # hostname (the UI hostname 302s to Authentik). Full traefik path.
           - https://smsgw.lab.gn.al/healthz
+          # cn-devices — UpSnap health (unauthenticated) through traefik-lab → kaiser
+          - https://devices.lab.gn.al/api/health
           # cn-nvr — Frigate's /api/version is routed WITHOUT the Authentik gate
           # (Consul service nvr-health), so the probe sees Frigate, not a 302.
           - https://nvr.lab.gn.al/api/version

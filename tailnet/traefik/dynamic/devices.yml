@@ -1,0 +1,31 @@
+# Tailnet route for cn-devices (UpSnap on kaiser.lan).
+# Backend: kaiser's cn-home traefik-lan on :443 serving devices.lab.gn.al with a
+# step-ca leaf (UpSnap itself listens on 127.0.0.1:8087 in the host netns —
+# no Tailscale sidecar, because WoL broadcasts need kaiser's real interface).
+# Reached through infra-exit's subnet route (ACL: tag:infra → 10.1.1.140:443).
+# Re-encrypt with insecureSkipVerify (same pattern as outline.yml): the browser
+# only ever sees the LE wildcard at this VPS hop.
+http:
+  serversTransports:
+    devices-kaiser-tls:
+      insecureSkipVerify: true
+
+  routers:
+    devices-lab:
+      rule: "Host(`devices.lab.gn.al`)"
+      entryPoints: [websecure]
+      service: devices-kaiser-443
+      priority: 100
+      tls:
+        certResolver: dns
+        domains:
+          - main: "lab.gn.al"
+            sans: ["*.lab.gn.al"]
+
+  services:
+    devices-kaiser-443:
+      loadBalancer:
+        passHostHeader: true
+        serversTransport: devices-kaiser-tls
+        servers:
+          - url: "https://10.1.1.140:443"

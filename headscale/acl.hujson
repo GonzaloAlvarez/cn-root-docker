@@ -80,6 +80,10 @@
     //           tailnet clients hit sync.lab.gn.al → 10.1.1.92:8001;
     //           routed in tailnet/traefik/dynamic/mzfxa.yml).
     { "action": "accept", "src": ["tag:infra"], "dst": ["10.1.1.92:443,8001,9300"] },
+    // cn-devices (UpSnap) on kaiser.lan — host-network app (WoL broadcast), so no
+    // sidecar; traefik-lab re-encrypts to kaiser's traefik-lan on :443 through
+    // infra-exit's route (tailnet/traefik/dynamic/devices.yml).
+    { "action": "accept", "src": ["tag:infra"], "dst": ["10.1.1.140:443"] },
 
     // cn-bittorrent on kaiser.lan — tag:vpn-client is egress-quarantined:
     // it MUST route public-internet egress via an exit node (infra-mullvad),

@@ -126,6 +126,8 @@ pages:
                     url: https://alertmanager.lab.gn.al
                   - title: Consul
                     url: https://consul.lab.gn.al/ui/
+                  - title: Devices
+                    url: https://devices.lab.gn.al
                   - title: Grafana
                     url: https://grafana.lab.gn.al
                   - title: Portainer
@@ -156,6 +158,11 @@ pages:
             sites:
               - title: Authentik
                 url: https://auth.lab.gn.al
+              - title: Devices
+                url: https://devices.lab.gn.al
+                # UpSnap's SPA is a 200 but logs in via Authentik; the health
+                # endpoint is the unauthenticated truth.
+                check-url: https://devices.lab.gn.al/api/health
               - title: NetBox
                 url: https://netbox.lab.gn.al
               - title: Outline
